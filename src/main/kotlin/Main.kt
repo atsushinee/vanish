@@ -3,11 +3,16 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.window.WindowDraggableArea
 import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
+import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.*
@@ -19,10 +24,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.*
+import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalComposeUiApi::class)
 fun main() = application {
@@ -30,32 +39,26 @@ fun main() = application {
     val virtualHeight = 30.dp
     val initialScale = 0.8f
 
-    // 从配置中加载窗口位置，如果不存在则使用默认值
     val initialX = AppConfig.getProperty("window.x", "0").toFloat()
     val initialY = AppConfig.getProperty("window.y", "0").toFloat()
 
     val windowState = rememberWindowState(
         size = DpSize(virtualWidth * initialScale, virtualHeight * initialScale),
-        // 使用加载的或默认的位置
         position = WindowPosition(initialX.dp, initialY.dp)
     )
     var isHovered by remember { mutableStateOf(false) }
     val targetAlpha = if (isHovered) 0.0f else 0f
     val animatedAlpha by animateFloatAsState(targetValue = targetAlpha)
-    // 右键菜单显示状态
     var showContextMenu by remember { mutableStateOf(false) }
+    var showHistoryPopup by remember { mutableStateOf(false) }
 
     val stockViewModel = remember { StockViewModel() }
 
     Window(
-        // 在关闭请求时保存窗口位置并退出
         onCloseRequest = {
-            // 保存窗口的 x 和 y 坐标
             AppConfig.setProperty("window.x", windowState.position.x.value.toString())
             AppConfig.setProperty("window.y", windowState.position.y.value.toString())
-            // 保存配置
             AppConfig.save()
-            // 退出应用程序
             exitApplication()
         },
         state = windowState,
@@ -65,7 +68,6 @@ fun main() = application {
         title = "Vanish",
         resizable = false
     ) {
-        // 启动时设置窗口背景为全透明
         LaunchedEffect(Unit) {
             window.background = java.awt.Color(0, 0, 0, 0)
         }
@@ -82,9 +84,7 @@ fun main() = application {
                                     PointerEventType.Enter -> isHovered = true
                                     PointerEventType.Exit -> isHovered = false
                                     PointerEventType.Press -> {
-                                        // 检查是否是鼠标右键点击
                                         if (event.buttons.isSecondaryPressed) {
-                                            // 显示右键菜单
                                             showContextMenu = true
                                         }
                                     }
@@ -97,15 +97,12 @@ fun main() = application {
             ) {
                 StockInfo(stockViewModel.stockData.value)
 
-                // 如果 showContextMenu 为 true，则显示自定义的右键菜单
                 if (showContextMenu) {
-                    // 使用 Popup 实现菜单，它不会在任务栏创建新窗口，并且可以定位在主窗口之外
                     Popup(
                         alignment = Alignment.Center,
                         offset = IntOffset(0, 0),
                         onDismissRequest = { showContextMenu = false }
                     ) {
-                        // 菜单内容区域
                         Row(
                             modifier = Modifier
                                 .width(virtualWidth * initialScale)
@@ -113,49 +110,107 @@ fun main() = application {
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(Color.Black.copy(alpha = 0.75f))
                                 .padding(horizontal = 4.dp)
-                                // 关键：为菜单背景添加手势检测
                                 .pointerInput(Unit) {
-                                    // 使用 detectTapGestures 来监听点击手势
-                                    // onTap 回调会在检测到单击时触发
                                     detectTapGestures(onTap = {
-                                        // 当用户点击的是 Row 的背景区域（非按钮部分）时，关闭菜单
                                         showContextMenu = false
                                         println("点击菜单背景，已关闭")
                                     })
                                 },
-                            horizontalArrangement = Arrangement.Center,
+                            horizontalArrangement = Arrangement.SpaceEvenly,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // 菜单项 1：刷新按钮
                             IconButton(onClick = {
                                 stockViewModel.refresh()
                                 showContextMenu = false
                                 println("刷新按钮点击")
                             }) {
-                                Icon(
-                                    imageVector = Icons.Default.Refresh,
-                                    contentDescription = "刷新",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(18.dp)
-                                )
+                                Icon(Icons.Default.Refresh, "刷新", tint = Color.White, modifier = Modifier.size(18.dp))
                             }
-
-                            // 菜单项 2：设置按钮（占位符）
+                            IconButton(onClick = {
+                                showHistoryPopup = true
+                                showContextMenu = false
+                                println("历史按钮点击")
+                            }) {
+                                Icon(Icons.Default.History, "历史", tint = Color.White, modifier = Modifier.size(18.dp))
+                            }
                             IconButton(onClick = {
                                 showContextMenu = false
                                 println("设置按钮点击")
                             }) {
-                                Icon(
-                                    imageVector = Icons.Default.Settings,
-                                    contentDescription = "设置",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(18.dp)
-                                )
+                                Icon(Icons.Default.Settings, "设置", tint = Color.White, modifier = Modifier.size(18.dp))
                             }
                         }
                     }
                 }
             }
         }
+    }
+
+    // 关键：将历史窗口的逻辑移到主窗口之外，并使用 DialogWindow
+    if (showHistoryPopup) {
+        // 使用 DialogWindow 创建一个真正的、独立的窗口，但它不会在任务栏显示图标
+        DialogWindow(
+            onCloseRequest = { showHistoryPopup = false }, // 当窗口请求关闭时（例如失去焦点），隐藏它
+            undecorated = true,
+            transparent = true,
+            alwaysOnTop = true,
+            resizable = false,
+            state = rememberDialogState(
+                // 关键：精确定位，使其紧贴主窗口右侧
+                position = WindowPosition(
+                    x = windowState.position.x + windowState.size.width, // 主窗口X坐标 + 主窗口宽度
+                    y = windowState.position.y // 与主窗口Y坐标对齐
+                ),
+                size = DpSize(320.dp, 300.dp) // 设置固定的尺寸
+            )
+        ) {
+            val listState = rememberLazyListState()
+            LaunchedEffect(stockViewModel.history.size) {
+                if (stockViewModel.history.isNotEmpty()) {
+                    listState.animateScrollToItem(stockViewModel.history.size - 1)
+                }
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color.Black.copy(alpha = 0.85f))
+            ) {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize().padding(8.dp)
+                ) {
+                    item {
+                        Row(Modifier.padding(bottom = 8.dp)) {
+                            Text("时间", Modifier.width(70.dp), color = Color.LightGray, fontSize = 10.sp)
+                            Text("代码", Modifier.width(60.dp), color = Color.LightGray, fontSize = 10.sp)
+                            Text("现价", Modifier.width(50.dp), color = Color.LightGray, fontSize = 10.sp)
+                            Text("涨幅", Modifier.width(50.dp), color = Color.LightGray, fontSize = 10.sp)
+                            Text("涨速", Modifier.width(50.dp), color = Color.LightGray, fontSize = 10.sp)
+                            Text("大盘", Modifier.width(40.dp), color = Color.LightGray, fontSize = 10.sp)
+                        }
+                    }
+                    items(stockViewModel.history) { data ->
+                        HistoryRow(data)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HistoryRow(data: StockData) {
+    val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm:ss") }
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 2.dp)) {
+        Text(data.timestamp.format(timeFormatter), Modifier.width(70.dp), color = Color.White, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+        Text(data.code, Modifier.width(60.dp), color = Color.White, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+        Text("%.2f".format(data.price), Modifier.width(50.dp), color = Color.White, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+        val changeColor = if (data.changePercent >= 0) Color(0xFFd81e06) else Color(0xFF1aad19)
+        Text("%.2f%%".format(data.changePercent), Modifier.width(50.dp), color = changeColor, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+        val riseColor = if (data.rise >= 0) Color(0xFFd81e06) else Color(0xFF1aad19)
+        Text("%.2f%%".format(data.rise), Modifier.width(50.dp), color = riseColor, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+        val indexColor = if (data.indexPercent >= 0) Color(0xFFd81e06) else Color(0xFF1aad19)
+        Text("%.2f%%".format(data.indexPercent), Modifier.width(40.dp), color = indexColor, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
     }
 }

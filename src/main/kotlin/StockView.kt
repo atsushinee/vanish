@@ -63,9 +63,9 @@ fun StockInfo(stockData: StockData?) {
 fun PreviewStockInfo() {
     MaterialTheme {
         Box(Modifier.background(Color.Black).size(240.dp * 0.8f, 40.dp * 0.8f)) {
-            StockInfo(
-                stockData = StockData(price = 12.34, changePercent = 1.23, rise = 0.5, indexPercent = -0.25)
-            )
+//            StockInfo(
+//                stockData = StockData(price = 12.34, changePercent = 1.23, rise = 0.5, indexPercent = -0.25)
+//            )
         }
     }
 }

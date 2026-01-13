@@ -1,3 +1,4 @@
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import kotlinx.coroutines.*
 import java.time.LocalTime
@@ -5,6 +6,7 @@ import java.time.ZoneId
 import java.util.logging.FileHandler
 import java.util.logging.Logger
 import java.util.logging.SimpleFormatter
+import java.time.LocalDateTime
 
 class StockViewModel {
 
@@ -16,7 +18,10 @@ class StockViewModel {
         addHandler(fileHandler)
     }
 
+    // 当前股票数据
     val stockData = mutableStateOf<StockData?>(null)
+    // 历史股票数据列表
+    val history = mutableStateListOf<StockData>()
     private var lastPrice = 0.0
     private val viewModelScope = CoroutineScope(Dispatchers.IO)
 
@@ -54,7 +59,23 @@ class StockViewModel {
 
                 val indexPct = if (indexQuote.preClose > 0) (indexQuote.price / indexQuote.preClose - 1) * 100 else 0.0
 
-                stockData.value = StockData(price, changePct, rise, indexPct)
+                // 创建新的 StockData 实例
+                val newStockData = StockData(
+                    code = TARGET_STOCK,
+                    price = price,
+                    changePercent = changePct,
+                    rise = rise,
+                    indexPercent = indexPct,
+                    timestamp = LocalDateTime.now()
+                )
+                // 更新当前数据
+                stockData.value = newStockData
+                // 将新数据添加到历史记录中
+                history.add(newStockData)
+                // 保持历史记录列表的大小不超过500，移除最旧的条目
+                if (history.size > 500) {
+                    history.removeAt(0)
+                }
             } else {
                 // 添加中文日志：数据获取或解析失败
                 logger.warning("[数据处理警告]: 获取新浪行情数据失败或返回数据不完整。")
