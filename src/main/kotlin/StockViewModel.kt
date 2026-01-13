@@ -145,8 +145,7 @@ class StockViewModel {
         val amEnd = LocalTime.of(11, 31)
         val pmStart = LocalTime.of(13, 0)
         val pmEnd = LocalTime.of(15, 1)
-//        return now in amStart..amEnd || now in pmStart..pmEnd
-        return true
+        return now in amStart..amEnd || now in pmStart..pmEnd
     }
 }
 

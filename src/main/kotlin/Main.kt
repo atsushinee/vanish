@@ -21,20 +21,58 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Window
-import androidx.compose.ui.window.WindowPosition
-import androidx.compose.ui.window.application
-import androidx.compose.ui.window.rememberWindowState
+import androidx.compose.ui.window.*
+import java.io.File
+import java.util.*
+import kotlin.system.exitProcess
+
+// AppConfig 单例对象，用于管理应用程序的配置
+object AppConfig {
+    // 配置文件路径
+    private val configFile = File("config.properties")
+    // Properties 对象，用于存储键值对
+    private val properties = Properties()
+
+    // 初始化块，在对象创建时执行
+    init {
+        // 如果配置文件存在，则加载它
+        if (configFile.exists()) {
+            // 使用文件输入流读取配置文件
+            configFile.inputStream().use { properties.load(it) }
+        }
+    }
+
+    // 获取属性值，如果不存在则返回默认值
+    fun getProperty(key: String, defaultValue: String): String {
+        return properties.getProperty(key, defaultValue)
+    }
+
+    // 设置属性值
+    fun setProperty(key: String, value: String) {
+        properties.setProperty(key, value)
+    }
+
+    // 保存配置到文件
+    fun save() {
+        // 使用文件输出流将配置写入文件
+        configFile.outputStream().use { properties.store(it, null) }
+    }
+}
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalComposeUiApi::class)
 fun main() = application {
-    val virtualWidth = 165.dp
+    val virtualWidth = 150.dp
     val virtualHeight = 30.dp
     val initialScale = 0.8f
 
+    // 从配置中加载窗口位置，如果不存在则使用默认值
+    val initialX = AppConfig.getProperty("window.x", "0").toFloat()
+    val initialY = AppConfig.getProperty("window.y", "0").toFloat()
+
     val windowState = rememberWindowState(
         size = DpSize(virtualWidth * initialScale, virtualHeight * initialScale),
-        position = WindowPosition(Alignment.Center)
+        // 使用加载的或默认的位置
+        position = WindowPosition(initialX.dp, initialY.dp)
     )
     var isHovered by remember { mutableStateOf(false) }
     val targetAlpha = if (isHovered) 0.6f else 0f
@@ -44,21 +82,23 @@ fun main() = application {
     val stockViewModel = remember { StockViewModel() }
 
     Window(
-        onCloseRequest = ::exitApplication,
+        // 在关闭请求时保存窗口位置并退出
+        onCloseRequest = {
+            // 保存窗口的 x 和 y 坐标
+            AppConfig.setProperty("window.x", windowState.position.x.value.toString())
+            AppConfig.setProperty("window.y", windowState.position.y.value.toString())
+            // 保存配置
+            AppConfig.save()
+            // 退出应用程序
+            exitApplication()
+        },
         state = windowState,
         undecorated = true,
         transparent = true,
         alwaysOnTop = true,
         title = "Vanish",
-        // 核心修正：将 resizable 设置为 false
-        // 目的：完全禁止用户通过拖拽边缘或角落来调整窗口大小。
-        // 原理：这是 Window Composable 提供的原生参数，它会直接通知操作系统窗口管理器锁定窗口尺寸。
         resizable = false
     ) {
-        // 既然窗口大小固定，就不再需要复杂的缩放逻辑了
-        // 我们可以直接使用 Box 来显示内容
-
-        // 仅在窗口创建时执行一次，用于防止背景闪烁
         LaunchedEffect(Unit) {
             window.background = java.awt.Color(0, 0, 0, 0)
         }
@@ -135,17 +175,17 @@ fun StockInfo(stockData: StockData?) {
             fontSize = 8.sp,
             fontFamily = FontFamily.Monospace
         )
-        Text(
-            text = stockData?.rise?.let { "%.2f%%".format(it) } ?: "--.--%",
-            color = when {
-                stockData == null -> Color.White
-                stockData.rise > 0.1 -> Color(0xFFd81e06)
-                stockData.rise < -0.1 -> Color(0xFF1aad19)
-                else -> Color.White
-            },
-            fontSize = 8.sp,
-            fontFamily = FontFamily.Monospace
-        )
+//        Text(
+//            text = stockData?.rise?.let { "%.2f%%".format(it) } ?: "--.--%",
+//            color = when {
+//                stockData == null -> Color.White
+//                stockData.rise > 0.1 -> Color(0xFFd81e06)
+//                stockData.rise < -0.1 -> Color(0xFF1aad19)
+//                else -> Color.White
+//            },
+//            fontSize = 8.sp,
+//            fontFamily = FontFamily.Monospace
+//        )
         Text(
             text = stockData?.indexPercent?.let { "%.2f%%".format(it) } ?: "--.--%",
             color = when {
