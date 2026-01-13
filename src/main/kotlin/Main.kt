@@ -1,5 +1,4 @@
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.desktop.ui.tooling.preview.Preview
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -17,51 +16,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.*
-import java.io.File
-import java.util.*
-import kotlin.system.exitProcess
-
-// AppConfig 单例对象，用于管理应用程序的配置
-object AppConfig {
-    // 配置文件路径
-    private val configFile = File("config.properties")
-    // Properties 对象，用于存储键值对
-    private val properties = Properties()
-
-    // 初始化块，在对象创建时执行
-    init {
-        // 如果配置文件存在，则加载它
-        if (configFile.exists()) {
-            // 使用文件输入流读取配置文件
-            configFile.inputStream().use { properties.load(it) }
-        }
-    }
-
-    // 获取属性值，如果不存在则返回默认值
-    fun getProperty(key: String, defaultValue: String): String {
-        return properties.getProperty(key, defaultValue)
-    }
-
-    // 设置属性值
-    fun setProperty(key: String, value: String) {
-        properties.setProperty(key, value)
-    }
-
-    // 保存配置到文件
-    fun save() {
-        // 使用文件输出流将配置写入文件
-        configFile.outputStream().use { properties.store(it, null) }
-    }
-}
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalComposeUiApi::class)
 fun main() = application {
-    val virtualWidth = 150.dp
+    val virtualWidth = 130.dp
     val virtualHeight = 30.dp
     val initialScale = 0.8f
 
@@ -148,65 +109,6 @@ fun main() = application {
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-fun StockInfo(stockData: StockData?) {
-    Row(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(
-            text = stockData?.price?.let { "%.2f".format(it) } ?: "--.--",
-            color = Color.White,
-            fontSize = 12.sp,
-            fontFamily = FontFamily.Monospace
-        )
-        Text(
-            text = stockData?.changePercent?.let { "%.2f%%".format(it) } ?: "--.--%",
-            color = when {
-                stockData == null -> Color.White
-                stockData.changePercent >= 0 -> Color(0xFFd81e06)
-                else -> Color(0xFF1aad19)
-            },
-            fontSize = 8.sp,
-            fontFamily = FontFamily.Monospace
-        )
-//        Text(
-//            text = stockData?.rise?.let { "%.2f%%".format(it) } ?: "--.--%",
-//            color = when {
-//                stockData == null -> Color.White
-//                stockData.rise > 0.1 -> Color(0xFFd81e06)
-//                stockData.rise < -0.1 -> Color(0xFF1aad19)
-//                else -> Color.White
-//            },
-//            fontSize = 8.sp,
-//            fontFamily = FontFamily.Monospace
-//        )
-        Text(
-            text = stockData?.indexPercent?.let { "%.2f%%".format(it) } ?: "--.--%",
-            color = when {
-                stockData == null -> Color.White
-                stockData.indexPercent >= 0 -> Color(0xFFd81e06)
-                else -> Color(0xFF1aad19)
-            },
-            fontSize = 8.sp,
-            fontFamily = FontFamily.Monospace
-        )
-    }
-}
-
-@Preview
-@Composable
-fun PreviewStockInfo() {
-    MaterialTheme {
-        Box(Modifier.background(Color.Black).size(240.dp * 0.8f, 40.dp * 0.8f)) {
-            StockInfo(
-                stockData = StockData(price = 12.34, changePercent = 1.23, rise = 0.5, indexPercent = -0.25)
-            )
         }
     }
 }
