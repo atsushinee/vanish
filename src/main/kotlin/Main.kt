@@ -2,6 +2,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -26,16 +27,19 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.DpSize
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.*
 import androidx.compose.ui.window.*
-import java.awt.event.ActionEvent
+import java.awt.SystemTray
+import java.awt.TrayIcon
+import java.awt.event.MouseAdapter
+import java.awt.event.MouseEvent
+import java.awt.event.WindowFocusListener
 import java.time.format.DateTimeFormatter
+import javax.imageio.ImageIO
 import javax.swing.SwingUtilities
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalComposeUiApi::class)
@@ -62,6 +66,13 @@ fun main() = application {
     var showContextMenu by remember { mutableStateOf(false) }
     var showHistoryPopup by remember { mutableStateOf(false) }
     var isWindowVisible by remember { mutableStateOf(true) } // 控制主窗口可见性
+    // 控制自定义托盘菜单的可见性
+    var showTrayMenu by remember { mutableStateOf(false) }
+    // 存储托盘菜单的显示位置（使用 Dp 单位）
+    var trayMenuPosition by remember { mutableStateOf(WindowPosition(0.dp, 0.dp)) }
+    // 获取当前屏幕的密度，用于将 AWT 的像素坐标转换为 Compose 的 Dp 坐标
+    val density = LocalDensity.current
+
 
     // 记住 ViewModel
     val stockViewModel = remember { StockViewModel() }
@@ -90,26 +101,129 @@ fun main() = application {
         historyWindowState.position = WindowPosition(x = historyX, y = historyY)
     }
 
-    // 托盘图标状态
-    val trayState = rememberTrayState()
+    // 使用 DisposableEffect 管理 AWT TrayIcon 的生命周期
+    DisposableEffect(Unit) {
+        SwingUtilities.invokeLater {
+            if (!SystemTray.isSupported()) {
+                println("系统不支持托盘")
+                return@invokeLater
+            }
 
-    // 托盘图标，加载 "app.ico"
-    Tray(
-        icon = painterResource("app.ico"),
-        state = trayState,
-        tooltip = "Vanish", // 鼠标悬停在托盘图标上时显示的工具提示
-        onAction = {
-            // 左键单击托盘图标时，切换主窗口的可见性
-            isWindowVisible = !isWindowVisible
-            println("托盘图标被点击，窗口可见性: $isWindowVisible")
-        },
-        menu = {
-            Item("Exit", onClick = {
-                println("菜单项 '退出' 被点击")
-                handleCloseRequest()
+            val tray = SystemTray.getSystemTray()
+            val image = try {
+                val resourceStream = Thread.currentThread().contextClassLoader.getResourceAsStream("app.ico")
+                ImageIO.read(resourceStream)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                null
+            }
+
+            if (image == null) {
+                println("加载托盘图标失败")
+                return@invokeLater
+            }
+
+            val trayIcon = TrayIcon(image, "Vanish")
+            trayIcon.isImageAutoSize = true
+
+            trayIcon.addMouseListener(object : MouseAdapter() {
+                override fun mousePressed(e: MouseEvent) {
+                    if (e.isPopupTrigger || SwingUtilities.isRightMouseButton(e)) {
+                        // 使用从 Compose 获取的 density 对象，将鼠标事件的像素(px)坐标转换为 Dp
+                        trayMenuPosition = with(density) {
+                            WindowPosition(e.x.toDp(), e.y.toDp())
+                        }
+                        // 触发菜单显示
+                        showTrayMenu = true
+                        println("托盘图标被右键点击，显示自定义菜单")
+                    } else {
+                        isWindowVisible = !isWindowVisible
+                        println("托盘图标被左键点击，窗口可见性: $isWindowVisible")
+                    }
+                }
             })
+
+            try {
+                tray.add(trayIcon)
+                println("自定义托盘图标已添加")
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
-    )
+
+        onDispose {
+            // 清理逻辑
+            println("托盘图标清理逻辑（示意）")
+        }
+    }
+
+    // 当 showTrayMenu 为 true 时，使用 DialogWindow 显示自定义菜单
+    if (showTrayMenu) {
+        DialogWindow(
+            onCloseRequest = { showTrayMenu = false },
+            state = rememberDialogState(
+                position = trayMenuPosition,
+                size = DpSize(50.dp, Dp.Unspecified)
+            ),
+            undecorated = true,
+            transparent = true,
+            resizable = false,
+            alwaysOnTop = true,
+            focusable = true
+        ) {
+            // 关键修复：使用 DisposableEffect 来安全地添加和移除 AWT 窗口焦点监听器。
+            // 这是解决“菜单在失去焦点后无法点击”问题的核心。
+            DisposableEffect(window) {
+                // 创建一个窗口焦点监听器实例
+                val listener = object : WindowFocusListener {
+                    override fun windowGainedFocus(e: java.awt.event.WindowEvent?) {}
+
+                    // 当菜单窗口失去系统焦点时（例如用户点击了任务栏或其他程序），此方法会被调用
+                    override fun windowLostFocus(e: java.awt.event.WindowEvent?) {
+                        // 将 showTrayMenu 状态设置为 false，从而以编程方式关闭菜单
+                        showTrayMenu = false
+                        println("菜单窗口失去焦点，已自动关闭")
+                    }
+                }
+                // 将监听器添加到 DialogWindow 的底层 AWT 窗口上
+                window.addWindowFocusListener(listener)
+
+                // onDispose 回调是 DisposableEffect 的一部分，在组件销毁时执行
+                onDispose {
+                    // 移除监听器，以防止在窗口关闭后发生内存泄漏
+                    window.removeWindowFocusListener(listener)
+                }
+            }
+
+            // 必须为 DialogWindow 的 AWT 窗口设置透明背景
+            window.background = java.awt.Color(0, 0, 0, 0)
+
+            // 菜单的容器，定义了其暗色、紧凑、圆角的样式
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color.Black.copy(alpha = 0.85f))
+                    .padding(vertical = 2.dp)
+            ) {
+                Text(
+                    text = "退出",
+                    color = Color.White,
+                    fontSize = 11.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            println("自定义菜单项 '退出' 被点击")
+                            showTrayMenu = false
+                            handleCloseRequest()
+                        }
+                        .padding(horizontal = 4.dp, vertical = 4.dp)
+                )
+            }
+        }
+    }
+
 
     // 仅当 isWindowVisible 为 true 时，才显示主窗口
     if (isWindowVisible) {
