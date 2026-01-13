@@ -94,6 +94,13 @@ fun main() = application {
         exitApplication() // 退出应用
     }
 
+    val changeVisible = {
+        isWindowVisible = !isWindowVisible
+        if (!isWindowVisible) {
+            showHistoryPopup = false
+        }
+    }
+
     // 使用 LaunchedEffect 监听主窗口位置变化，以同步更新历史窗口的位置
     LaunchedEffect(windowState.position) {
         val historyY = windowState.position.y - historyWindowState.size.height - 4.dp
@@ -137,7 +144,7 @@ fun main() = application {
                         showTrayMenu = true
                         println("托盘图标被右键点击，显示自定义菜单")
                     } else {
-                        isWindowVisible = !isWindowVisible
+                        changeVisible()
                         println("托盘图标被左键点击，窗口可见性: $isWindowVisible")
                     }
                 }
@@ -311,7 +318,7 @@ fun main() = application {
                                     )
                                 }
                                 // 关闭按钮（隐藏窗口）
-                                IconButton(onClick = { isWindowVisible = false }) {
+                                IconButton(onClick = handleCloseRequest) {
                                     Icon(Icons.Default.Close, "关闭", tint = Color.White, modifier = Modifier.size(12.dp))
                                 }
                             }
