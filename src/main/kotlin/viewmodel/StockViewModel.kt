@@ -1,5 +1,6 @@
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
+package viewmodel
+
+import data.model.StockData
 import kotlinx.coroutines.*
 import java.time.LocalDateTime
 import java.time.LocalTime
@@ -8,6 +9,14 @@ import java.time.format.DateTimeFormatter
 import java.util.logging.FileHandler
 import java.util.logging.Logger
 import java.util.logging.SimpleFormatter
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import data.remote.getSinaBatchRealtimeData
+import data.remote.getSinaRealtimeData
+
+// TODO: 将这些常量移至 AppConfig
+private const val TARGET_STOCK = "sz002413"
+private const val INDEX_CODE = "sh000001"
 
 class StockViewModel {
 

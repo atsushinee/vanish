@@ -1,7 +1,5 @@
 package ui.screen
 
-import StockData
-import StockViewModel
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -24,6 +22,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogState
 import androidx.compose.ui.window.DialogWindow
+import data.model.StockData
+import viewmodel.StockViewModel
 import java.time.format.DateTimeFormatter
 
 /**

@@ -1,6 +1,5 @@
 package ui.screen
 
-import StockData
 import StockInfo
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
@@ -23,6 +22,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowState
+import data.model.StockData
 import ui.component.ContextMenu
 
 /**

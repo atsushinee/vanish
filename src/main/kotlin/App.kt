@@ -6,11 +6,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberDialogState
 import androidx.compose.ui.window.rememberWindowState
+import config.AppConfig
 import ui.component.TrayMenu
 import ui.screen.HistoryScreen
 import ui.screen.MainScreen
 import ui.screen.WatchlistScreen
 import util.TrayManager
+import viewmodel.StockViewModel
 
 /**
  * 应用程序的主 Composable 函数，负责整体的结构和状态管理。

@@ -1,3 +1,6 @@
+package data.remote
+
+import data.model.SinaQuote
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.request.*
@@ -7,10 +10,6 @@ import java.util.logging.Logger
 
 // ================= 1. 核心配置 =================
 private const val SINA_HQ_URL_FORMAT = "http://hq.sinajs.cn/rn=%s&list=%s"
-
-//internal const val TARGET_STOCK = "002639.SZ"
-internal const val TARGET_STOCK = "002413.SZ"
-internal const val INDEX_CODE = "sh000001"
 
 private val client = HttpClient(CIO)
 private val logger = Logger.getLogger("StockApiLog")
@@ -66,7 +65,7 @@ internal suspend fun getSinaRealtimeData(code: String): SinaQuote? {
  * @param codes 逗号分隔的股票代码字符串 (例如 "sh600000,sz000001")。
  * @return 从API获取的原始响应字符串，多行数据以 \n 分隔。
  */
-internal suspend fun getSinaBatchRealtimeData(codes: String): String {
+suspend fun getSinaBatchRealtimeData(codes: String): String {
     // 如果传入的代码字符串为空，则直接返回空字符串，避免无效的网络请求。
     if (codes.isBlank()) {
         // 记录一次警告日志，便于追踪可能的前端逻辑问题。

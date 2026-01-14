@@ -1,7 +1,5 @@
 package ui.screen
 
-import StockData
-import StockViewModel
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -21,6 +19,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogState
 import androidx.compose.ui.window.DialogWindow
+import data.model.StockData
+import viewmodel.StockViewModel
 
 /**
  * 自选股列表弹窗
