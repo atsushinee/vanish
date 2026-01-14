@@ -1,5 +1,6 @@
 package viewmodel
 
+import config.AppConfig
 import data.model.StockData
 import kotlinx.coroutines.*
 import java.time.LocalDateTime
@@ -12,10 +13,6 @@ import java.util.logging.SimpleFormatter
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import data.remote.getSinaBatchRealtimeData
-
-// TODO: 将这些常量移至 AppConfig
-private const val TARGET_STOCK = "sz002413"
-private const val INDEX_CODE = "sh000001"
 
 class StockViewModel {
 
@@ -38,7 +35,7 @@ class StockViewModel {
     // ================= 自选股监控模块 =================
 
     // 用于存储用户配置的自选股代码列表。
-    val watchlistCodes = mutableStateListOf("sh000001", "sz002413", "sz002639", "sh603273")
+    val watchlistCodes = mutableStateListOf<String>()
 
     // 存储处理后的自选股实时数据，用于UI展示。
     val watchlistData = mutableStateListOf<StockData>()
@@ -86,6 +83,13 @@ class StockViewModel {
     }
 
     init {
+        // 目的: 从配置文件加载关注的股票代码，如果配置不存在，则使用默认值。
+        // 原理: 调用 AppConfig.getProperty，如果 "watchlistCodes" 键不存在，则返回一个预设的默认字符串。
+        val codes = AppConfig.getProperty("watchlistCodes", "sh000001,sz002413,sz002639,sh603273")
+        // 目的: 将从配置中读取的、以逗号分隔的字符串转换为列表，并填充到UI状态中。
+        // 原理: 使用 split(',') 将字符串分割，filter { it.isNotBlank() } 过滤掉可能存在的空字符串，然后添加到 mutableStateListOf 中。
+        watchlistCodes.addAll(codes.split(',').filter { it.isNotBlank() })
+
         viewModelScope.launch {
             startRealtimeMonitor()
         }
@@ -104,7 +108,12 @@ class StockViewModel {
 
     private suspend fun fetchRealtimeData() {
         try {
-            val codes = listOf(TARGET_STOCK, INDEX_CODE).joinToString(",")
+            // 目的: 从 AppConfig 获取目标股票和指数代码，如果不存在则使用默认值。
+            // 原理: AppConfig.getProperty 会从配置文件读取，若键不存在，则返回提供的默认值。
+            val targetStock = AppConfig.getProperty("targetStock", "sz002413")
+            val indexCode = AppConfig.getProperty("indexCode", "sh000001")
+
+            val codes = listOf(targetStock, indexCode).joinToString(",")
             val rawResponse = getSinaBatchRealtimeData(codes)
             val quotesMap = rawResponse.lines()
                 .filter { it.isNotBlank() }
@@ -147,8 +156,8 @@ class StockViewModel {
 
             // 目的: 从解析后的Map中安全地获取个股和指数的数据。
             // 原理: 使用代码作为键直接从Map中查找。
-            val stockQuoteData = quotesMap[TARGET_STOCK]
-            val indexQuoteData = quotesMap[INDEX_CODE]
+            val stockQuoteData = quotesMap[targetStock]
+            val indexQuoteData = quotesMap[indexCode]
 
             // 目的: 确保个股和指数的数据都成功获取到，才能进行后续计算。
             if (stockQuoteData != null && indexQuoteData != null) {
@@ -174,7 +183,7 @@ class StockViewModel {
                 // 目的: 创建一个新的 StockData 对象，用于封装所有计算出的新数据。
                 // 注意事项: 这是UI状态更新的源头。
                 val newStockData = StockData(
-                    code = TARGET_STOCK,
+                    code = targetStock,
                     name = "", // 主监控窗口不展示名称，保持与原逻辑一致
                     price = price,
                     changePercent = changePct,
@@ -285,12 +294,42 @@ class StockViewModel {
     }
 
     private fun isTradingTime(): Boolean {
-        LocalTime.now(ZoneId.of("Asia/Shanghai"))
-        LocalTime.of(9, 25)
-        LocalTime.of(11, 31)
-        LocalTime.of(13, 0)
-        LocalTime.of(15, 1)
-//        return now in amStart..amEnd || now in pmStart..pmEnd
-        return true
+        val now = LocalTime.now(ZoneId.of("Asia/Shanghai"))
+        val amStart = LocalTime.of(9, 25)
+        val amEnd = LocalTime.of(11, 31)
+        val pmStart = LocalTime.of(13, 0)
+        val pmEnd = LocalTime.of(15, 1)
+        return now in amStart..amEnd || now in pmStart..pmEnd
+    }
+
+    /**
+     * 添加一只新的自选股到列表，并持久化保存。
+     * @param code 股票代码
+     */
+    fun addWatchlistCode(code: String) {
+        // 目的: 防止重复添加。
+        if (code.isNotBlank() && !watchlistCodes.contains(code)) {
+            // 目的: 更新UI状态列表。
+            watchlistCodes.add(code)
+            // 目的: 将更新后的列表持久化到配置文件。
+            // 原理: 将列表转换为以逗号分隔的字符串，然后通过 AppConfig 保存。
+            AppConfig.setProperty("watchlistCodes", watchlistCodes.joinToString(","))
+            AppConfig.save()
+            logger.info("[自选股配置]: 添加新自选股 $code 并已保存。")
+        }
+    }
+
+    /**
+     * 从列表中移除一只自选股，并持久化保存。
+     * @param code 股票代码
+     */
+    fun removeWatchlistCode(code: String) {
+        // 目的: 从UI状态列表中移除指定的代码。
+        if (watchlistCodes.remove(code)) {
+            // 目的: 将更新后的列表持久化到配置文件。
+            AppConfig.setProperty("watchlistCodes", watchlistCodes.joinToString(","))
+            AppConfig.save()
+            logger.info("[自选股配置]: 移除自选股 $code 并已保存。")
+        }
     }
 }
