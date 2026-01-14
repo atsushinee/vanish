@@ -1,7 +1,10 @@
 package viewmodel
 
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import config.AppConfig
 import data.model.StockData
+import data.remote.getSinaBatchRealtimeData
 import kotlinx.coroutines.*
 import java.time.LocalDateTime
 import java.time.LocalTime
@@ -10,9 +13,6 @@ import java.time.format.DateTimeFormatter
 import java.util.logging.FileHandler
 import java.util.logging.Logger
 import java.util.logging.SimpleFormatter
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import data.remote.getSinaBatchRealtimeData
 
 class StockViewModel {
 
@@ -51,8 +51,10 @@ class StockViewModel {
 
     /**
      * 启动自选股的实时监控。
+     * 优化了轮询逻辑，区分交易与非交易时段。
      */
     fun startWatchlistMonitor() {
+        // 防止重复启动监控任务
         if (watchlistJob?.isActive == true) {
             logger.info("[自选股监控]: 监控任务已在运行，无需重复启动。")
             return
@@ -60,14 +62,18 @@ class StockViewModel {
 
         watchlistJob = viewModelScope.launch {
             logger.info("[自选股监控]: 监控任务已启动。")
+            var hasFetchedOnceOutOfHours = false
+
             while (isActive) {
-                if (isTradingTime()) {
+                val inTradingTime = isTradingTime()
+                if (inTradingTime || !hasFetchedOnceOutOfHours) {
                     fetchWatchlistData()
+                    if (!inTradingTime) hasFetchedOnceOutOfHours = true
                 }
-                delay(2000L)
             }
         }
     }
+
 
     /**
      * 停止自选股的实时监控。
@@ -94,9 +100,13 @@ class StockViewModel {
     // ================= 2. 实时监控模块 =================
 
     private suspend fun startRealtimeMonitor() {
+        var hasFetchedOnceOutOfHours = false
+
         while (viewModelScope.isActive) {
-            if (isTradingTime()) {
+            val inTradingTime = isTradingTime()
+            if (inTradingTime || !hasFetchedOnceOutOfHours) {
                 fetchRealtimeData()
+                if (!inTradingTime) hasFetchedOnceOutOfHours = true
             }
             delay(2000L)
         }
