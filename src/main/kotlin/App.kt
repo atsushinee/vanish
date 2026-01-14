@@ -25,9 +25,10 @@ fun App(onExit: () -> Unit) {
     val virtualHeight = 30.dp
     val initialScale = 0.8f
 
-    // 从配置文件加载并记住窗口的初始位置
-    val initialX = AppConfig.getProperty("window.x", "0").toFloat()
-    val initialY = AppConfig.getProperty("window.y", "0").toFloat()
+    // 目的: 通过 AppConfig 的类型安全属性获取窗口初始位置。
+    // 原理: 直接访问 AppConfig.windowX 和 AppConfig.windowY，它们返回 Float 类型，无需关心转换和默认值。
+    val initialX = AppConfig.windowX
+    val initialY = AppConfig.windowY
 
     // 记住主窗口的状态（大小、位置）
     val windowState = rememberWindowState(
@@ -41,8 +42,6 @@ fun App(onExit: () -> Unit) {
     val isWindowVisible = remember { mutableStateOf(true) }
     val showTrayMenu = remember { mutableStateOf(false) }
     val showContextMenu = remember { mutableStateOf(false) }
-    // 修复：明确指定 trayMenuPosition 的状态类型为通用的 WindowPosition
-    // 这是为了防止 Kotlin 类型推断将其默认为 WindowPosition.Absolute，从而在赋值时产生类型不匹配的编译错误。
     val trayMenuPosition = remember { mutableStateOf<WindowPosition>(WindowPosition(0.dp, 0.dp)) }
 
     // 记住 ViewModel 的单一实例
@@ -54,28 +53,29 @@ fun App(onExit: () -> Unit) {
 
     // 定义关闭应用程序时的处理逻辑
     val handleCloseRequest = {
-        // 在保存位置前，必须检查 position 是否是 Absolute 类型
         val currentPosition = windowState.position
         if (currentPosition is WindowPosition.Absolute) {
-            // 确认是绝对位置后，安全地访问 x 和 y
-            AppConfig.setProperty("window.x", currentPosition.x.value.toString())
-            AppConfig.setProperty("window.y", currentPosition.y.value.toString())
+            // 目的: 通过 AppConfig 的类型安全属性保存窗口位置。
+            // 原理: 直接为 AppConfig.windowX 和 AppConfig.windowY 赋值，其 setter 会处理持久化。
+            AppConfig.windowX = currentPosition.x.value
+            AppConfig.windowY = currentPosition.y.value
         }
-        AppConfig.save() // 保存配置到文件
-        onExit() // 调用从 main 传递过来的退出函数
+        // 目的: 统一调用 save 方法，将所有变更一次性写入文件。
+        // 注意: 这是确保所有配置（包括 ViewModel 中可能修改的）都被保存的关键。
+        AppConfig.save()
+        onExit()
     }
 
     // 定义切换主窗口可见性的逻辑
     val changeVisible = {
         isWindowVisible.value = !isWindowVisible.value
-        // 当主窗口隐藏时，确保所有关联的弹窗也一并隐藏
         if (!isWindowVisible.value) {
             showHistoryPopup.value = false
             showWatchlistPopup.value = false
         }
     }
 
-    // 当主窗口位置或大小变化时，自动调整弹窗的位置，使其与主窗口保持相对固定
+    // 当主窗口位置或大小变化时，自动调整弹窗的位置
     LaunchedEffect(windowState.position, windowState.size) {
         val currentPosition = windowState.position
         if (currentPosition is WindowPosition.Absolute) {
@@ -89,7 +89,7 @@ fun App(onExit: () -> Unit) {
         }
     }
 
-    // 监听自选股弹窗的可见性变化，以启动或停止对应的数据监控
+    // 监听自选股弹窗的可见性变化，以启动或停止数据监控
     LaunchedEffect(showWatchlistPopup.value) {
         if (showWatchlistPopup.value) {
             stockViewModel.startWatchlistMonitor()
@@ -100,7 +100,7 @@ fun App(onExit: () -> Unit) {
         }
     }
 
-    // 管理系统托盘图标及其交互
+    // 管理系统托盘图标
     TrayManager(
         onTrayIconClick = { changeVisible() },
         onTrayIconRightClick = { position ->
@@ -109,22 +109,20 @@ fun App(onExit: () -> Unit) {
         }
     )
 
-    // 显示自定义的托盘菜单
+    // 显示托盘菜单
     TrayMenu(
         showTrayMenu = showTrayMenu,
         trayMenuPosition = trayMenuPosition.value,
         onCloseRequest = handleCloseRequest
     )
 
-    // 获取股票数据
     val stockData = stockViewModel.stockData.value
 
-    // 根据可见性状态决定是否渲染主窗口
-    // 只有在 stockData 非空时才渲染主窗口，避免传入 null
+    // 主窗口渲染
     if (isWindowVisible.value) {
         MainScreen(
             windowState = windowState,
-            stockData = stockData, // 此处 stockData 已确保非空
+            stockData = stockData,
             virtualWidth = virtualWidth,
             virtualHeight = virtualHeight,
             initialScale = initialScale,
@@ -136,14 +134,14 @@ fun App(onExit: () -> Unit) {
         )
     }
 
-    // 渲染历史记录弹窗（如果其状态为可见）
+    // 历史记录弹窗
     HistoryScreen(
         showHistoryPopup = showHistoryPopup,
         stockViewModel = stockViewModel,
         historyWindowState = historyWindowState
     )
 
-    // 渲染自选股列表弹窗（如果其状态为可见）
+    // 自选股列表弹窗
     WatchlistScreen(
         showWatchlistPopup = showWatchlistPopup,
         stockViewModel = stockViewModel,
