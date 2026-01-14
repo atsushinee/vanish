@@ -1,14 +1,10 @@
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.VerticalScrollbar
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.window.WindowDraggableArea
 import androidx.compose.material.Icon
@@ -23,8 +19,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isPrimaryPressed
 import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -248,6 +246,10 @@ fun main() = application {
             LaunchedEffect(Unit) {
                 window.background = java.awt.Color(0, 0, 0, 0)
             }
+            var lastTapTime by remember { mutableStateOf(0L) }
+            var lastTapPosition by remember { mutableStateOf(Offset.Zero) }
+            val density = LocalDensity.current
+            val tapTolerancePx = with(density) { 24.dp.toPx() }
 
             WindowDraggableArea {
                 Box(
@@ -263,6 +265,20 @@ fun main() = application {
                                         PointerEventType.Press -> {
                                             if (event.buttons.isSecondaryPressed) {
                                                 showContextMenu = true
+                                            } else if (event.buttons.isPrimaryPressed) {
+                                                val currentTime = System.currentTimeMillis()
+                                                val currentPos = event.changes.first().position
+
+                                                if (currentTime - lastTapTime < 300 &&
+                                                    (currentPos - lastTapPosition).getDistance() <= tapTolerancePx
+                                                ) {
+                                                    // 双击
+                                                    showHistoryPopup = !showHistoryPopup
+                                                    lastTapTime = 0 // 防止三连击触发第二次双击
+                                                } else {
+                                                    lastTapTime = currentTime
+                                                    lastTapPosition = currentPos
+                                                }
                                             }
                                         }
                                     }
@@ -303,7 +319,12 @@ fun main() = application {
                                     showContextMenu = false
                                     println("历史按钮点击，当前状态: $showHistoryPopup")
                                 }) {
-                                    Icon(Icons.Default.History, "历史", tint = Color.White, modifier = Modifier.size(12.dp))
+                                    Icon(
+                                        Icons.Default.History,
+                                        "历史",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(12.dp)
+                                    )
                                 }
                                 // 设置按钮
                                 IconButton(onClick = {
@@ -319,7 +340,12 @@ fun main() = application {
                                 }
                                 // 关闭按钮（隐藏窗口）
                                 IconButton(onClick = handleCloseRequest) {
-                                    Icon(Icons.Default.Close, "关闭", tint = Color.White, modifier = Modifier.size(12.dp))
+                                    Icon(
+                                        Icons.Default.Close,
+                                        "关闭",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(12.dp)
+                                    )
                                 }
                             }
                         }
