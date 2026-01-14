@@ -63,13 +63,13 @@ fun WatchlistScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                        .padding(horizontal = 4.dp, vertical = 1.dp),
                     contentAlignment = Alignment.CenterStart
                 ) {
                     Text(
                         text = stockViewModel.lastUpdateTime.value,
                         color = Color.LightGray,
-                        fontSize = 8.sp,
+                        fontSize = 7.sp,
                         fontFamily = FontFamily.Monospace
                     )
                 }
