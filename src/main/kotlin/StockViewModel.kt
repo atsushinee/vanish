@@ -199,7 +199,7 @@ class StockViewModel {
                 // 定义一个更友好的时间格式
                 val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
                 // 将当前时间格式化为字符串，并更新到UI状态中
-                lastUpdateTime.value = "更新时间: ${LocalDateTime.now().format(formatter)}"
+                lastUpdateTime.value = "${LocalDateTime.now().format(formatter)}"
             }
 
         } catch (e: Exception) {

@@ -84,7 +84,7 @@ fun main() = application {
     )
     // 恢复：将自选股窗口的尺寸恢复到进行紧凑化修改之前的状态
     val watchlistWindowState = rememberDialogState(
-        size = DpSize(320.dp, 180.dp)
+        size = DpSize(200.dp, 70.dp)
     )
 
 
@@ -283,7 +283,7 @@ fun main() = application {
                                                 if (currentTime - lastTapTime < 300 &&
                                                     (currentPos - lastTapPosition).getDistance() <= tapTolerancePx
                                                 ) {
-                                                    showHistoryPopup = !showHistoryPopup
+                                                    showWatchlistPopup = !showWatchlistPopup
                                                     lastTapTime = 0
                                                 } else {
                                                     lastTapTime = currentTime
@@ -342,17 +342,6 @@ fun main() = application {
                                     Icon(
                                         Icons.Default.List,
                                         "自选列表",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(12.dp)
-                                    )
-                                }
-                                IconButton(onClick = {
-                                    showContextMenu = false
-                                    println("设置按钮点击")
-                                }) {
-                                    Icon(
-                                        Icons.Default.Settings,
-                                        "设置",
                                         tint = Color.White,
                                         modifier = Modifier.size(12.dp)
                                     )
@@ -437,48 +426,51 @@ fun main() = application {
             resizable = false,
             state = watchlistWindowState
         ) {
-            WindowDraggableArea {
-                val listState = rememberLazyListState()
+            val listState = rememberLazyListState()
 
-                Column(
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color.Black.copy(alpha = 0.7f))
+                    .combinedClickable(
+                        onClick = {},
+                        onDoubleClick = { showWatchlistPopup = false }
+                    )
+            ) {
+                Box(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(Color.Black.copy(alpha = 0.7f))
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    contentAlignment = Alignment.CenterStart
                 ) {
-                    // 恢复：更新时间区域的内边距恢复到原始值
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                        contentAlignment = Alignment.CenterStart
-                    ) {
-                        Text(
-                            text = stockViewModel.lastUpdateTime.value,
-                            color = Color.LightGray,
-                            fontSize = 10.sp,
-                            fontFamily = FontFamily.Monospace
-                        )
-                    }
+                    Text(
+                        text = stockViewModel.lastUpdateTime.value,
+                        color = Color.LightGray,
+                        fontSize = 8.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
 
-                    Box(
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                ) {
+                    LazyColumn(
+                        state = listState,
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
+                            .fillMaxSize()
+                            .padding(horizontal = 4.dp)
+                            .height(watchlistWindowState.size.height) // 默认显示5行数据的高度
                     ) {
-                        LazyColumn(
-                            state = listState,
-                            modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp)
-                        ) {
-                            items(stockViewModel.watchlistData) { data ->
-                                WatchlistRow(data)
-                            }
+                        items(stockViewModel.watchlistData) { data ->
+                            WatchlistRow(data)
                         }
-                        VerticalScrollbar(
-                            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
-                            adapter = rememberScrollbarAdapter(scrollState = listState)
-                        )
                     }
+                    VerticalScrollbar(
+                        modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
+                        adapter = rememberScrollbarAdapter(scrollState = listState)
+                    )
                 }
             }
         }
@@ -535,58 +527,49 @@ private fun HistoryRow(data: StockData) {
     }
 }
 
-/**
- * 恢复：将自选股列表的行布局恢复到进行紧凑化修改之前的状态。
- * @param data 包含单只股票信息的 StockData 对象。
- */
 @Composable
 private fun WatchlistRow(data: StockData) {
-    // 恢复：垂直内边距恢复到原始值
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 2.dp)) {
-        // 恢复：股票名称列宽度
+    // 移除了垂直内边距
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 0.dp)) { // 修改这里
         Text(
             text = data.name,
-            modifier = Modifier.width(70.dp),
+            modifier = Modifier.weight(1f), // 使用weight代替固定宽度以自适应内容
             color = Color.White,
-            fontSize = 11.sp,
+            fontSize = 8.sp, // 调整字体大小
             textAlign = TextAlign.Start,
             maxLines = 1
         )
-        // 恢复：股票代码列宽度
         Text(
             text = data.code.removePrefix("sh").removePrefix("sz"),
-            modifier = Modifier.width(60.dp),
+            modifier = Modifier.weight(1f), // 股票代码列较窄
             color = Color.LightGray,
-            fontSize = 11.sp,
+            fontSize = 10.sp,
             fontFamily = FontFamily.Monospace,
             textAlign = TextAlign.Start
         )
-        // 恢复：价格列宽度
         Text(
             text = "%.2f".format(data.price),
-            modifier = Modifier.width(50.dp),
+            modifier = Modifier.weight(1.1f), // 根据需要调整权重
             color = Color.White,
-            fontSize = 11.sp,
+            fontSize = 10.sp,
             fontFamily = FontFamily.Monospace,
             textAlign = TextAlign.End
         )
-        // 恢复：涨跌幅列宽度
         val changeColor = if (data.changePercent >= 0) Color(0xFFd81e06) else Color(0xFF1aad19)
         Text(
             text = "%.2f%%".format(data.changePercent),
-            modifier = Modifier.width(50.dp),
+            modifier = Modifier.weight(1f),
             color = changeColor,
-            fontSize = 11.sp,
+            fontSize = 10.sp,
             fontFamily = FontFamily.Monospace,
             textAlign = TextAlign.End
         )
-        // 恢复：涨速列宽度
         val riseColor = if (data.rise >= 0) Color(0xFFd81e06) else Color(0xFF1aad19)
         Text(
             text = "%.2f%%".format(data.rise),
-            modifier = Modifier.width(50.dp),
+            modifier = Modifier.weight(1f),
             color = riseColor,
-            fontSize = 11.sp,
+            fontSize = 10.sp,
             fontFamily = FontFamily.Monospace,
             textAlign = TextAlign.End
         )
