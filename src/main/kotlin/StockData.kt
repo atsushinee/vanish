@@ -10,6 +10,7 @@ internal data class SinaQuote(val price: Double, val preClose: Double)
 /**
  * 用于UI显示的股票数据模型。
  * @param code 股票代码
+ * @param name 股票名称
  * @param price 当前价格
  * @param changePercent 涨跌幅
  * @param rise 瞬时涨跌幅 (与上次刷新相比)
@@ -18,6 +19,7 @@ internal data class SinaQuote(val price: Double, val preClose: Double)
  */
 data class StockData(
     val code: String,
+    val name: String, // 新增：股票名称字段
     val price: Double,
     val changePercent: Double,
     val rise: Double,

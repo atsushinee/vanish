@@ -82,9 +82,9 @@ fun main() = application {
     val historyWindowState = rememberDialogState(
         size = DpSize(240.dp, 45.dp)
     )
-    // 新增状态：记住自选股窗口的状态，包括尺寸和位置
+    // 恢复：将自选股窗口的尺寸恢复到进行紧凑化修改之前的状态
     val watchlistWindowState = rememberDialogState(
-        size = DpSize(240.dp, 150.dp) // 给予一个默认尺寸
+        size = DpSize(320.dp, 180.dp)
     )
 
 
@@ -108,24 +108,26 @@ fun main() = application {
         }
     }
 
-    // 使用 LaunchedEffect 监听主窗口位置变化，以同步更新历史窗口的位置
-    LaunchedEffect(windowState.position) {
+    // 当主窗口移动时，历史记录窗口和自选股窗口会随之移动，保持相对位置
+    LaunchedEffect(windowState.position, windowState.size) {
+        // 计算历史记录窗口的位置，使其位于主窗口正上方
         val historyY = windowState.position.y - historyWindowState.size.height - 4.dp
         val historyX = windowState.position.x + (windowState.size.width - historyWindowState.size.width) / 2
         historyWindowState.position = WindowPosition(x = historyX, y = historyY)
+
+        // 计算自选股窗口的位置，使其也位于主窗口正上方
+        val watchlistY = windowState.position.y - watchlistWindowState.size.height - 4.dp
+        val watchlistX = windowState.position.x + (windowState.size.width - watchlistWindowState.size.width) / 2
+        watchlistWindowState.position = WindowPosition(x = watchlistX, y = watchlistY)
     }
 
+
     // 使用 LaunchedEffect 监听自选股窗口的可见性变化
-    // 这是管理后台任务生命周期的最佳实践，确保与UI状态同步
     LaunchedEffect(showWatchlistPopup) {
         if (showWatchlistPopup) {
-            // 当自选股窗口变为可见时，启动ViewModel中的监控循环
-            // 这会开始后台轮询获取自选股数据
             stockViewModel.startWatchlistMonitor()
             println("自选股监控已启动")
         } else {
-            // 当自选股窗口关闭或隐藏时，停止监控循环
-            // 这会取消后台任务，释放网络和CPU资源，避免不必要的消耗
             stockViewModel.stopWatchlistMonitor()
             println("自选股监控已停止")
         }
@@ -159,11 +161,9 @@ fun main() = application {
             trayIcon.addMouseListener(object : MouseAdapter() {
                 override fun mousePressed(e: MouseEvent) {
                     if (e.isPopupTrigger || SwingUtilities.isRightMouseButton(e)) {
-                        // 使用从 Compose 获取的 density 对象，将鼠标事件的像素(px)坐标转换为 Dp
                         trayMenuPosition = with(density) {
                             WindowPosition(e.x.toDp(), e.y.toDp())
                         }
-                        // 触发菜单显示
                         showTrayMenu = true
                         println("托盘图标被右键点击，显示自定义菜单")
                     } else {
@@ -182,7 +182,6 @@ fun main() = application {
         }
 
         onDispose {
-            // 清理逻辑
             println("托盘图标清理逻辑（示意）")
         }
     }
@@ -201,34 +200,22 @@ fun main() = application {
             alwaysOnTop = true,
             focusable = true
         ) {
-            // 关键修复：使用 DisposableEffect 来安全地添加和移除 AWT 窗口焦点监听器。
-            // 这是解决“菜单在失去焦点后无法点击”问题的核心。
             DisposableEffect(window) {
-                // 创建一个窗口焦点监听器实例
                 val listener = object : WindowFocusListener {
                     override fun windowGainedFocus(e: java.awt.event.WindowEvent?) {}
-
-                    // 当菜单窗口失去系统焦点时（例如用户点击了任务栏或其他程序），此方法会被调用
                     override fun windowLostFocus(e: java.awt.event.WindowEvent?) {
-                        // 将 showTrayMenu 状态设置为 false，从而以编程方式关闭菜单
                         showTrayMenu = false
                         println("菜单窗口失去焦点，已自动关闭")
                     }
                 }
-                // 将监听器添加到 DialogWindow 的底层 AWT 窗口上
                 window.addWindowFocusListener(listener)
-
-                // onDispose 回调是 DisposableEffect 的一部分，在组件销毁时执行
                 onDispose {
-                    // 移除监听器，以防止在窗口关闭后发生内存泄漏
                     window.removeWindowFocusListener(listener)
                 }
             }
 
-            // 必须为 DialogWindow 的 AWT 窗口设置透明背景
             window.background = java.awt.Color(0, 0, 0, 0)
 
-            // 菜单的容器，定义了其暗色、紧凑、圆角的样式
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -258,16 +245,15 @@ fun main() = application {
     // 仅当 isWindowVisible 为 true 时，才显示主窗口
     if (isWindowVisible) {
         Window(
-            onCloseRequest = { isWindowVisible = false }, // 点击关闭按钮时隐藏窗口，而不是退出
+            onCloseRequest = { isWindowVisible = false },
             state = windowState,
             undecorated = true,
             transparent = true,
             alwaysOnTop = true,
             title = "Vanish",
             resizable = false,
-            icon = painterResource("app.ico") // 设置窗口图标
+            icon = painterResource("app.ico")
         ) {
-            // 设置窗口背景为透明
             LaunchedEffect(Unit) {
                 window.background = java.awt.Color(0, 0, 0, 0)
             }
@@ -297,9 +283,8 @@ fun main() = application {
                                                 if (currentTime - lastTapTime < 300 &&
                                                     (currentPos - lastTapPosition).getDistance() <= tapTolerancePx
                                                 ) {
-                                                    // 双击
                                                     showHistoryPopup = !showHistoryPopup
-                                                    lastTapTime = 0 // 防止三连击触发第二次双击
+                                                    lastTapTime = 0
                                                 } else {
                                                     lastTapTime = currentTime
                                                     lastTapPosition = currentPos
@@ -315,7 +300,6 @@ fun main() = application {
                 ) {
                     StockInfo(stockViewModel.stockData.value)
 
-                    // 右键上下文菜单
                     if (showContextMenu) {
                         Popup(
                             alignment = Alignment.Center,
@@ -338,7 +322,6 @@ fun main() = application {
                                 horizontalArrangement = Arrangement.SpaceEvenly,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                // 历史记录按钮
                                 IconButton(onClick = {
                                     showHistoryPopup = !showHistoryPopup
                                     showContextMenu = false
@@ -351,22 +334,18 @@ fun main() = application {
                                         modifier = Modifier.size(12.dp)
                                     )
                                 }
-                                // 新增：自选列表按钮
                                 IconButton(onClick = {
-                                    // 点击时，切换自选股面板的显示状态
                                     showWatchlistPopup = !showWatchlistPopup
-                                    // 同时关闭当前的右键菜单
                                     showContextMenu = false
                                     println("自选列表按钮点击，当前状态: $showWatchlistPopup")
                                 }) {
                                     Icon(
-                                        Icons.Default.List, // 使用列表图标
+                                        Icons.Default.List,
                                         "自选列表",
                                         tint = Color.White,
                                         modifier = Modifier.size(12.dp)
                                     )
                                 }
-                                // 设置按钮
                                 IconButton(onClick = {
                                     showContextMenu = false
                                     println("设置按钮点击")
@@ -378,7 +357,6 @@ fun main() = application {
                                         modifier = Modifier.size(12.dp)
                                     )
                                 }
-                                // 关闭按钮（隐藏窗口）
                                 IconButton(onClick = handleCloseRequest) {
                                     Icon(
                                         Icons.Default.Close,
@@ -409,20 +387,15 @@ fun main() = application {
             val listState = rememberLazyListState()
             var oldSize by remember { mutableStateOf(0) }
 
-            // 当历史记录大小变化时，自动滚动到底部
             LaunchedEffect(stockViewModel.history.size) {
                 val newSize = stockViewModel.history.size
                 if (newSize == 0) return@LaunchedEffect
-
                 val layoutInfo = listState.layoutInfo
                 val lastVisibleItemIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index
-
                 val shouldScroll = lastVisibleItemIndex == null || (oldSize > 0 && lastVisibleItemIndex >= oldSize - 1)
-
                 if (shouldScroll) {
                     listState.animateScrollToItem(newSize - 1)
                 }
-
                 oldSize = newSize
             }
 
@@ -454,49 +427,59 @@ fun main() = application {
         }
     }
 
-    // 新增：自选股列表弹窗
+    // 自选股列表弹窗
     if (showWatchlistPopup) {
         DialogWindow(
-            onCloseRequest = { showWatchlistPopup = false }, // 点击外部或请求关闭时，隐藏窗口
-            undecorated = true, // 无边框
-            transparent = true, // 透明背景
-            alwaysOnTop = true, // 保持在顶层
-            resizable = false, // 不可调整大小
-            state = watchlistWindowState // 使用预定义的窗口状态
+            onCloseRequest = { showWatchlistPopup = false },
+            undecorated = true,
+            transparent = true,
+            alwaysOnTop = true,
+            resizable = false,
+            state = watchlistWindowState
         ) {
-            // 记住列表的滚动状态，以便后续操作
-            val listState = rememberLazyListState()
+            WindowDraggableArea {
+                val listState = rememberLazyListState()
 
-            // 弹窗主容器，设置了与历史面板一致的视觉风格
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(RoundedCornerShape(4.dp)) // 圆角
-                    .background(Color.Black.copy(alpha = 0.4f)) // 半透明黑色背景
-                    .pointerInput(Unit) {
-                        // 添加点击手势，点击面板本身即可关闭
-                        detectTapGestures(onTap = {
-                            showWatchlistPopup = false
-                            println("自选股面板被点击，已关闭")
-                        })
-                    }
-            ) {
-                // 懒加载列表，用于高效地显示可能很长的自选股列表
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp)
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(Color.Black.copy(alpha = 0.7f))
                 ) {
-                    // 遍历ViewModel中获取到的自选股数据
-                    items(stockViewModel.watchlistData) { data ->
-                        // 为列表中的每一项渲染一个自定义行组件
-                        WatchlistRow(data)
+                    // 恢复：更新时间区域的内边距恢复到原始值
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        contentAlignment = Alignment.CenterStart
+                    ) {
+                        Text(
+                            text = stockViewModel.lastUpdateTime.value,
+                            color = Color.LightGray,
+                            fontSize = 10.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                    ) {
+                        LazyColumn(
+                            state = listState,
+                            modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp)
+                        ) {
+                            items(stockViewModel.watchlistData) { data ->
+                                WatchlistRow(data)
+                            }
+                        }
+                        VerticalScrollbar(
+                            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
+                            adapter = rememberScrollbarAdapter(scrollState = listState)
+                        )
                     }
                 }
-                // 添加一个垂直滚动条，并将其与列表的滚动状态关联
-                VerticalScrollbar(
-                    modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
-                    adapter = rememberScrollbarAdapter(scrollState = listState)
-                )
             }
         }
     }
@@ -506,7 +489,6 @@ fun main() = application {
 private fun HistoryRow(data: StockData) {
     val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm:ss") }
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 1.dp)) {
-        // 时间列
         Text(
             text = data.timestamp.format(timeFormatter),
             modifier = Modifier.width(50.dp),
@@ -515,7 +497,6 @@ private fun HistoryRow(data: StockData) {
             fontFamily = FontFamily.Monospace,
             textAlign = TextAlign.Center
         )
-        // 价格列
         Text(
             text = "%.2f".format(data.price),
             modifier = Modifier.width(46.dp),
@@ -524,7 +505,6 @@ private fun HistoryRow(data: StockData) {
             fontFamily = FontFamily.Monospace,
             textAlign = TextAlign.End
         )
-        // 涨跌幅列
         val changeColor = if (data.changePercent >= 0) Color(0xFFd81e06) else Color(0xFF1aad19)
         Text(
             text = "%.2f%%".format(data.changePercent),
@@ -534,7 +514,6 @@ private fun HistoryRow(data: StockData) {
             fontFamily = FontFamily.Monospace,
             textAlign = TextAlign.End
         )
-        // 涨速列
         val riseColor = if (data.rise >= 0) Color(0xFFd81e06) else Color(0xFF1aad19)
         Text(
             text = "%.2f%%".format(data.rise),
@@ -544,7 +523,6 @@ private fun HistoryRow(data: StockData) {
             fontFamily = FontFamily.Monospace,
             textAlign = TextAlign.End
         )
-        // 大盘指数涨跌幅列
         val indexColor = if (data.indexPercent >= 0) Color(0xFFd81e06) else Color(0xFF1aad19)
         Text(
             text = "%.2f%%".format(data.indexPercent),
@@ -558,33 +536,41 @@ private fun HistoryRow(data: StockData) {
 }
 
 /**
- * 新增的可组合函数，用于渲染自选股列表中的单行数据。
+ * 恢复：将自选股列表的行布局恢复到进行紧凑化修改之前的状态。
  * @param data 包含单只股票信息的 StockData 对象。
  */
 @Composable
 private fun WatchlistRow(data: StockData) {
-    // 定义行的通用样式，包括垂直居中对齐和内边距
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 1.dp)) {
-        // 股票代码列
+    // 恢复：垂直内边距恢复到原始值
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 2.dp)) {
+        // 恢复：股票名称列宽度
         Text(
-            text = data.code,
-            modifier = Modifier.width(70.dp), // 分配固定宽度以对齐
+            text = data.name,
+            modifier = Modifier.width(70.dp),
             color = Color.White,
             fontSize = 11.sp,
-            fontFamily = FontFamily.Monospace, // 使用等宽字体以获得更好的对齐效果
-            textAlign = TextAlign.Start // 居左对齐
+            textAlign = TextAlign.Start,
+            maxLines = 1
         )
-        // 价格列
+        // 恢复：股票代码列宽度
+        Text(
+            text = data.code.removePrefix("sh").removePrefix("sz"),
+            modifier = Modifier.width(60.dp),
+            color = Color.LightGray,
+            fontSize = 11.sp,
+            fontFamily = FontFamily.Monospace,
+            textAlign = TextAlign.Start
+        )
+        // 恢复：价格列宽度
         Text(
             text = "%.2f".format(data.price),
             modifier = Modifier.width(50.dp),
             color = Color.White,
             fontSize = 11.sp,
             fontFamily = FontFamily.Monospace,
-            textAlign = TextAlign.End // 居右对齐
+            textAlign = TextAlign.End
         )
-        // 涨跌幅列
-        // 根据涨跌幅的正负决定文本颜色，红色代表上涨，绿色代表下跌
+        // 恢复：涨跌幅列宽度
         val changeColor = if (data.changePercent >= 0) Color(0xFFd81e06) else Color(0xFF1aad19)
         Text(
             text = "%.2f%%".format(data.changePercent),
@@ -594,7 +580,7 @@ private fun WatchlistRow(data: StockData) {
             fontFamily = FontFamily.Monospace,
             textAlign = TextAlign.End
         )
-        // 涨速列
+        // 恢复：涨速列宽度
         val riseColor = if (data.rise >= 0) Color(0xFFd81e06) else Color(0xFF1aad19)
         Text(
             text = "%.2f%%".format(data.rise),
