@@ -1,7 +1,7 @@
-import androidx.compose.desktop.ui.tooling.preview.Preview
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
-import androidx.compose.material.MaterialTheme
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -58,14 +58,3 @@ fun StockInfo(stockData: StockData?) {
     }
 }
 
-@Preview
-@Composable
-fun PreviewStockInfo() {
-    MaterialTheme {
-        Box(Modifier.background(Color.Black).size(240.dp * 0.8f, 40.dp * 0.8f)) {
-//            StockInfo(
-//                stockData = StockData(price = 12.34, changePercent = 1.23, rise = 0.5, indexPercent = -0.25)
-//            )
-        }
-    }
-}

@@ -1,14 +1,13 @@
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
-import getSinaBatchRealtimeData
 import kotlinx.coroutines.*
+import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.logging.FileHandler
 import java.util.logging.Logger
 import java.util.logging.SimpleFormatter
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 
 class StockViewModel {
 
@@ -22,6 +21,7 @@ class StockViewModel {
 
     // 当前股票数据
     val stockData = mutableStateOf<StockData?>(null)
+
     // 历史股票数据列表
     val history = mutableStateListOf<StockData>()
     private var lastPrice = 0.0
@@ -172,7 +172,8 @@ class StockViewModel {
                         val changePct = (price / preClose - 1) * 100
 
                         val lastPriceForRise = watchlistLastPrices[code]
-                        val rise = if (lastPriceForRise != null && lastPriceForRise > 0) (price - lastPriceForRise) / lastPriceForRise * 100 else 0.0
+                        val rise =
+                            if (lastPriceForRise != null && lastPriceForRise > 0) (price - lastPriceForRise) / lastPriceForRise * 100 else 0.0
                         watchlistLastPrices[code] = price
 
                         StockData(
@@ -215,11 +216,11 @@ class StockViewModel {
     }
 
     private fun isTradingTime(): Boolean {
-        val now = LocalTime.now(ZoneId.of("Asia/Shanghai"))
-        val amStart = LocalTime.of(9, 25)
-        val amEnd = LocalTime.of(11, 31)
-        val pmStart = LocalTime.of(13, 0)
-        val pmEnd = LocalTime.of(15, 1)
+        LocalTime.now(ZoneId.of("Asia/Shanghai"))
+        LocalTime.of(9, 25)
+        LocalTime.of(11, 31)
+        LocalTime.of(13, 0)
+        LocalTime.of(15, 1)
 //        return now in amStart..amEnd || now in pmStart..pmEnd
         return true
     }

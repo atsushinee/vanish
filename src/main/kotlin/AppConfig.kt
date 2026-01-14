@@ -5,6 +5,7 @@ import java.util.*
 object AppConfig {
     // 配置文件路径
     private val configFile = File("config.properties")
+
     // Properties 对象，用于存储键值对
     private val properties = Properties()
 

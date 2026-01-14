@@ -7,6 +7,7 @@ import java.util.logging.Logger
 
 // ================= 1. 核心配置 =================
 private const val SINA_HQ_URL_FORMAT = "http://hq.sinajs.cn/rn=%s&list=%s"
+
 //internal const val TARGET_STOCK = "002639.SZ"
 internal const val TARGET_STOCK = "002413.SZ"
 internal const val INDEX_CODE = "sh000001"
@@ -79,7 +80,10 @@ internal suspend fun getSinaBatchRealtimeData(codes: String): String {
         // 使用共享的Ktor客户端实例发起GET请求。
         val response = client.get(url) {
             // 设置与浏览器行为一致的User-Agent头，模拟普通用户访问，提高接口可用性。
-            header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36 Edg/119.0.0.0")
+            header(
+                "User-Agent",
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36 Edg/119.0.0.0"
+            )
             // 设置Referer头，这是新浪行情接口的一个常见要求，表明请求来源。
             header("Referer", "https://finance.sina.com.cn/")
         }
