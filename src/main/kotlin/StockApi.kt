@@ -7,7 +7,8 @@ import java.util.logging.Logger
 
 // ================= 1. 核心配置 =================
 private const val SINA_HQ_URL_FORMAT = "http://hq.sinajs.cn/rn=%s&list=%s"
-internal const val TARGET_STOCK = "002639.SZ"
+//internal const val TARGET_STOCK = "002639.SZ"
+internal const val TARGET_STOCK = "002413.SZ"
 internal const val INDEX_CODE = "sh000001"
 
 private val client = HttpClient(CIO)
