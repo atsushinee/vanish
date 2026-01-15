@@ -27,6 +27,8 @@ fun TrayManager(
     // 使用 DisposableEffect 来管理 AWT TrayIcon 的生命周期
     // 这确保了托盘图标只在 Composable 存在时显示，并在其销毁时被移除
     DisposableEffect(Unit) {
+        // 声明一个变量来持有 TrayIcon 实例，以便在 onDispose 中可以访问它
+        var trayIcon: TrayIcon? = null
         // AWT/Swing 操作必须在 EDT (Event Dispatch Thread) 上执行
         SwingUtilities.invokeLater {
             // 检查当前系统是否支持托盘
@@ -35,6 +37,7 @@ fun TrayManager(
                 return@invokeLater
             }
 
+            // 获取系统托盘实例
             val tray = SystemTray.getSystemTray()
             // 从资源加载托盘图标
             val image = try {
@@ -50,28 +53,26 @@ fun TrayManager(
                 return@invokeLater
             }
 
-            // 创建 TrayIcon
-            val trayIcon = TrayIcon(image, "Vanish")
-            trayIcon.isImageAutoSize = true // 自动调整图标大小
+            trayIcon = TrayIcon(image, "Vanish").apply {
+                isImageAutoSize = true // 自动调整图标大小
 
-            // 添加鼠标事件监听器
-            trayIcon.addMouseListener(object : MouseAdapter() {
-                override fun mousePressed(e: MouseEvent) {
-                    // 判断是右键点击还是左键点击
-                    if (e.isPopupTrigger || SwingUtilities.isRightMouseButton(e)) {
-                        // 如果是右键，计算点击位置并调用右键回调
-                        val position = with(density) {
-                            WindowPosition(e.x.toDp(), e.y.toDp())
+                addMouseListener(object : MouseAdapter() {
+                    override fun mousePressed(e: MouseEvent) {
+                        // 判断是右键点击还是左键点击
+                        if (e.isPopupTrigger || SwingUtilities.isRightMouseButton(e)) {
+                            val position = with(density) {
+                                WindowPosition(e.x.toDp(), e.y.toDp())
+                            }
+                            onTrayIconRightClick(position)
+                            println("托盘图标被右键点击，显示自定义菜单")
+                        } else {
+                            onTrayIconClick()
+                            println("托盘图标被左键点击")
                         }
-                        onTrayIconRightClick(position)
-                        println("托盘图标被右键点击，显示自定义菜单")
-                    } else {
-                        // 如果是左键，调用左键回调
-                        onTrayIconClick()
-                        println("托盘图标被左键点击")
                     }
-                }
-            })
+                })
+            }
+
 
             try {
                 // 将托盘图标添加到系统托盘
@@ -82,10 +83,13 @@ fun TrayManager(
             }
         }
 
-        // onDispose 用于在 Composable 销毁时执行清理操作
         onDispose {
-            // 这里可以添加移除托盘图标的逻辑，但在应用退出时通常由操作系统自动处理
-            println("托盘图标清理逻辑（示意）")
+            SwingUtilities.invokeLater {
+                trayIcon?.let {
+                    SystemTray.getSystemTray().remove(it)
+                    println("自定义托盘图标已移除")
+                }
+            }
         }
     }
 }

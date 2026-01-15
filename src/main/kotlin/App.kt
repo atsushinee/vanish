@@ -14,6 +14,7 @@ import ui.screen.TimeShareScreen
 import ui.screen.WatchlistScreen
 import util.TrayManager
 import viewmodel.StockViewModel
+import kotlin.system.exitProcess
 
 /**
  * 应用程序的主 Composable 函数，负责整体的结构和状态管理。
@@ -57,12 +58,16 @@ fun App(onExit: () -> Unit) {
     val timeShareDialogState = rememberDialogState(size = androidx.compose.ui.unit.DpSize(200.dp, 70.dp))
 
 
+    // 定义关闭应用程序的逻辑
     val handleCloseRequest = {
+        // 保存当前窗口位置
         val currentPosition = mainDialogState.position
         AppConfig.windowX = currentPosition.x.value
         AppConfig.windowY = currentPosition.y.value
         AppConfig.save()
-        onExit()
+        // 强制退出JVM进程
+        // 这是确保应用程序完全关闭的最可靠方法，可以避免因非守护线程或未释放的资源导致进程残留。
+        exitProcess(0)
     }
 
     // 定义切换主窗口可见性的逻辑
