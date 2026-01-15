@@ -32,6 +32,13 @@ dependencies {
     // Kotlinx Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 
+    // Logback 日志实现
+    // 目的：替换 slf4j-simple，使用功能更强大的 Logback 作为日志框架。
+    // 原理：Logback 是一个成熟、稳定且功能丰富的日志实现，是 SLF4J 官方推荐的实现之一。
+    //      `logback-classic` 依赖会自动传递 `slf4j-api` 和 `logback-core`，因此只需要添加这一个依赖即可。
+    //      它允许通过 `logback.xml` 文件进行灵活的配置。
+    implementation("ch.qos.logback:logback-classic:1.4.14")
+
     // 核心修正：使用 Compose Multiplatform 的版本目录来引入图标库
     // 目的：从根本上解决依赖版本冲突。
     // 原理：`compose.materialIconsExtended` 会让 `org.jetbrains.compose` 插件自动选择与项目中其他 Compose 库完全兼容的版本，

@@ -1,0 +1,36 @@
+<configuration>
+
+    <!-- 控制台输出器 -->
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <!--
+                日志输出格式：
+                %d{HH:mm:ss.SSS} - 时间戳，格式为 时:分:秒.毫秒
+                [%thread] - 打印日志的线程名
+                %-5level - 日志级别，左对齐，宽度为5个字符（例如 DEBUG, INFO, WARN, ERROR）
+                %logger{36} - Logger 名称，通常是类的全限定名，最长36个字符
+                - %msg%n - 日志消息和换行符
+            -->
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!--
+        根 Logger 配置：
+        level="INFO" - 设置全局日志级别为 INFO。只有 INFO 及以上级别的日志（INFO, WARN, ERROR）才会被处理。
+                       如果想看更详细的日志（例如 DEBUG, TRACE），可以将其修改为 "DEBUG"。
+    -->
+    <root level="INFO">
+        <!-- 将 STDOUT 输出器附加到根 Logger -->
+        <appender-ref ref="STDOUT" />
+    </root>
+
+    <!--
+        可以为特定的包或类设置不同的日志级别。
+        例如，下面的配置将 io.ktor 包的日志级别设置为 WARN，以减少网络库产生的冗长日志。
+        这是一个很好的实践，可以让你只关注自己应用的日志。
+    -->
+    <logger name="io.ktor" level="WARN"/>
+    <logger name="org.apache.http" level="WARN"/>
+
+</configuration>
