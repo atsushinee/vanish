@@ -23,25 +23,14 @@ import androidx.compose.ui.window.DialogState
 import androidx.compose.ui.window.DialogWindow
 import data.model.StockData
 import ui.component.ContextMenu
+import java.awt.Dialog
 
 /**
- * 应用的主UI屏幕，现在被包裹在一个Dialog中。
- * @param dialogState 主对话框的状态，控制大小和位置
- * @param stockData 当前要显示的股票数据
- * @param virtualWidth 虚拟宽度，用于布局
- * @param virtualHeight 虚拟高度，用于布局
- * @param initialScale 初始缩放比例
- * @param showContextMenu 控制上下文菜单可见性的状态
- * @param onShowHistory 回调：当请求显示历史记录时触发
- * @param onShowWatchlist 回调：当请求显示自选股列表时触发
- * @param onShowTimeShare 回调：当请求显示分时图时触发
- * @param onDoubleClick 回调：当双击主UI时触发
- * @param onCloseRequest 回调：当请求关闭应用时触发
- * @param onVisibilityChange 回调：当窗口可见性需要改变时触发
+ * 应用的主UI屏幕，被包裹在一个特殊的 DialogWindow 中。
  */
 @Composable
 fun MainScreen(
-    dialogState: DialogState, // 核心修正：接收 DialogState 而不是 WindowState
+    dialogState: DialogState,
     stockData: StockData?,
     virtualWidth: Dp,
     virtualHeight: Dp,
@@ -58,24 +47,28 @@ fun MainScreen(
     val targetAlpha = if (isHovered) 0.0f else 0f
     val animatedAlpha by animateFloatAsState(targetValue = targetAlpha)
 
-    // 核心修正：使用 Dialog 组件替换 Window 组件
-    // 原理：Dialog 默认不会在任务栏显示图标，完美符合需求。
-    //      同时，保持所有样式属性（undecorated, transparent, alwaysOnTop）不变，以维持原有的视觉效果。
     DialogWindow(
-        onCloseRequest = { onVisibilityChange(false) }, // 关闭对话框时仅改变可见性
-        state = dialogState, // 应用从 App.kt 传入的 DialogState
+        onCloseRequest = { onVisibilityChange(false) },
+        state = dialogState,
         undecorated = true,
         transparent = true,
         alwaysOnTop = true,
         resizable = false
     ) {
-        // 用于检测双击事件的状态
+        // 核心修正：采用“组合拳”方案，彻底阻止窗口出现在任务切换器中
+        LaunchedEffect(window) {
+            // 第一招：设置模态排除类型，建议操作系统不要将其包含在任务列表中。
+            window.modalExclusionType = Dialog.ModalExclusionType.APPLICATION_EXCLUDE
+            // 第二招：明确设置窗口不可聚焦。一个不能被聚焦的窗口，通常不会被任务切换器所关心。
+            // 这是解决某些操作系统或桌面环境依然显示窗口问题的关键一步。
+            window.focusableWindowState = false
+        }
+
         var lastTapTime by remember { mutableStateOf(0L) }
         var lastTapPosition by remember { mutableStateOf(Offset.Zero) }
         val density = LocalDensity.current
         val tapTolerancePx = with(density) { 24.dp.toPx() }
 
-        // 使整个对话框内容可拖动
         WindowDraggableArea {
             Box(
                 modifier = Modifier

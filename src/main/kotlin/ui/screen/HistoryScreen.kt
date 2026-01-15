@@ -25,13 +25,11 @@ import androidx.compose.ui.window.DialogWindow
 import data.model.StockData
 import util.color
 import viewmodel.StockViewModel
+import java.awt.Dialog
 import java.time.format.DateTimeFormatter
 
 /**
  * 历史记录弹窗
- * @param showHistoryPopup 控制弹窗可见性的状态
- * @param stockViewModel 提供历史数据的 ViewModel
- * @param historyWindowState 弹窗的状态，用于控制位置和大小
  */
 @Composable
 fun HistoryScreen(
@@ -39,7 +37,6 @@ fun HistoryScreen(
     stockViewModel: StockViewModel,
     historyWindowState: DialogState
 ) {
-    // 仅当 showHistoryPopup 为 true 时显示弹窗
     if (showHistoryPopup.value) {
         DialogWindow(
             onCloseRequest = { showHistoryPopup.value = false },
@@ -49,21 +46,22 @@ fun HistoryScreen(
             resizable = false,
             state = historyWindowState
         ) {
-            // 记住列表滚动状态
+            // 核心修正：采用“组合拳”方案，彻底阻止窗口出现在任务切换器中
+            LaunchedEffect(window) {
+                window.modalExclusionType = Dialog.ModalExclusionType.APPLICATION_EXCLUDE
+                window.focusableWindowState = false
+            }
+
             val listState = rememberLazyListState()
-            // 记住上一次列表的大小，用于判断是否需要滚动
             var oldSize by remember { mutableStateOf(0) }
 
-            // 当历史记录数量变化时，自动滚动到最新的条目
             LaunchedEffect(stockViewModel.history.size) {
                 val newSize = stockViewModel.history.size
                 if (newSize == 0) return@LaunchedEffect
                 val layoutInfo = listState.layoutInfo
                 val lastVisibleItemIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index
-                // 判断是否应该滚动：如果是第一次加载，或者用户停留在列表末尾
                 val shouldScroll = lastVisibleItemIndex == null || (oldSize > 0 && lastVisibleItemIndex >= oldSize - 1)
                 if (shouldScroll) {
-                    // 平滑滚动到列表末尾
                     listState.animateScrollToItem(newSize - 1)
                 }
                 oldSize = newSize
@@ -74,7 +72,6 @@ fun HistoryScreen(
                     .fillMaxSize()
                     .clip(RoundedCornerShape(4.dp))
                     .background(Color.Black.copy(alpha = 0.4f))
-                    // 添加点击手势，点击面板任何地方都会关闭它
                     .pointerInput(Unit) {
                         detectTapGestures(onTap = {
                             showHistoryPopup.value = false
@@ -82,7 +79,6 @@ fun HistoryScreen(
                         })
                     }
             ) {
-                // 使用 LazyColumn 高效显示列表
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp)
@@ -91,7 +87,6 @@ fun HistoryScreen(
                         HistoryRow(data)
                     }
                 }
-                // 添加垂直滚动条
                 VerticalScrollbar(
                     modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
                     adapter = rememberScrollbarAdapter(scrollState = listState)
@@ -103,11 +98,9 @@ fun HistoryScreen(
 
 /**
  * 历史记录中的单行数据展示
- * @param data 单条股票数据
  */
 @Composable
 private fun HistoryRow(data: StockData) {
-    // 记住时间格式化器以提高性能
     val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm:ss") }
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 1.dp)) {
         Text(

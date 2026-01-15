@@ -1,6 +1,9 @@
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.DialogState
+import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberDialogState
 import config.AppConfig
@@ -17,6 +20,12 @@ import viewmodel.StockViewModel
  */
 @Composable
 fun App(onExit: () -> Unit) {
+    Window(
+        onCloseRequest = onExit, // 将其关闭请求连接到顶级退出函数，作为安全保障
+        visible = false, // 确保对话框永远不可见
+        undecorated = true // 一个不可见的对话框也应该是无边框的
+    ) {}
+
     // 定义UI的常量尺寸
     val virtualWidth = 135.dp
     val virtualHeight = 30.dp
@@ -25,9 +34,6 @@ fun App(onExit: () -> Unit) {
     val initialX = AppConfig.windowX
     val initialY = AppConfig.windowY
 
-    // 核心修正：将主窗口的 State 从 rememberWindowState 改为 rememberDialogState
-    // 原理：使用 DialogState 来管理主UI，这样它在渲染时就可以被放入一个 Dialog 中，从而避免在任务栏显示图标。
-    //      其 API 与 WindowState 高度兼容，可以无缝替换。
     val mainDialogState = rememberDialogState(
         size = androidx.compose.ui.unit.DpSize(virtualWidth * initialScale, virtualHeight * initialScale),
         position = WindowPosition(initialX.dp, initialY.dp)
@@ -51,10 +57,8 @@ fun App(onExit: () -> Unit) {
     val timeShareDialogState = rememberDialogState(size = androidx.compose.ui.unit.DpSize(200.dp, 70.dp))
 
 
-    // 核心修正：更新关闭逻辑，使其从 mainDialogState 中读取位置
     val handleCloseRequest = {
         val currentPosition = mainDialogState.position
-        // 注意：DialogState 的位置不是 Absolute，所以这里不需要 is WindowPosition.Absolute 的判断
         AppConfig.windowX = currentPosition.x.value
         AppConfig.windowY = currentPosition.y.value
         AppConfig.save()
@@ -71,9 +75,6 @@ fun App(onExit: () -> Unit) {
         }
     }
 
-    // 核心修正：更新位置同步逻辑，使其依赖于 mainDialogState
-    // 原理：将 LaunchedEffect 的 key 从 windowState.position 改为 mainDialogState.position，
-    //      并从 mainDialogState 中读取位置和大小来计算其他对话框的位置。
     LaunchedEffect(mainDialogState.position, mainDialogState.size) {
         val currentPosition = mainDialogState.position
         // 更新历史记录窗口位置
@@ -123,7 +124,6 @@ fun App(onExit: () -> Unit) {
 
     // 主窗口渲染
     if (isWindowVisible.value) {
-        // 核心修正：将 mainDialogState 传递给 MainScreen
         MainScreen(
             dialogState = mainDialogState,
             stockData = stockData,

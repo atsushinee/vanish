@@ -26,6 +26,7 @@ import data.model.TimeSharePoint
 import kotlinx.coroutines.delay
 import viewmodel.TimeShareUiState
 import viewmodel.TimeShareViewModel
+import java.awt.Dialog
 import kotlin.math.max
 
 /**
@@ -41,16 +42,9 @@ fun TimeShareScreen(
     val viewModel = remember(code) { TimeShareViewModel(code) }
     val uiState by viewModel.uiState.collectAsState()
 
-    // 核心修正：添加 LaunchedEffect 以实现定时刷新
-    // 原理：LaunchedEffect 将一个协程的生命周期与 Composable 的生命周期绑定。
-    //      当 TimeShareScreen 出现在屏幕上时，这个协程会自动启动；当它消失时，协程会自动取消。
-    //      `key1 = Unit` 表示这个 effect 只在 Composable 首次加载时运行一次。
     LaunchedEffect(Unit) {
-        // 使用一个无限循环来持续刷新数据
         while (true) {
-            // 调用 ViewModel 中的公共方法来加载最新数据
             viewModel.loadTimeShareData()
-            // 使用 delay 函数挂起协程5秒钟，实现定时效果
             delay(5000)
         }
     }
@@ -63,6 +57,12 @@ fun TimeShareScreen(
         alwaysOnTop = true,
         resizable = false
     ) {
+        // 核心修正：采用“组合拳”方案，彻底阻止窗口出现在任务切换器中
+        LaunchedEffect(window) {
+            window.modalExclusionType = Dialog.ModalExclusionType.APPLICATION_EXCLUDE
+            window.focusableWindowState = false
+        }
+
         MaterialTheme(colors = darkColors()) {
             Box(
                 modifier = Modifier

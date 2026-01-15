@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,12 +23,10 @@ import androidx.compose.ui.window.DialogWindow
 import data.model.StockData
 import util.color
 import viewmodel.StockViewModel
+import java.awt.Dialog
 
 /**
  * 自选股列表弹窗
- * @param showWatchlistPopup 控制弹窗可见性的状态
- * @param stockViewModel 提供自选股数据的 ViewModel
- * @param watchlistWindowState 弹窗的状态，用于控制位置和大小
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -36,7 +35,6 @@ fun WatchlistScreen(
     stockViewModel: StockViewModel,
     watchlistWindowState: DialogState
 ) {
-    // 仅当 showWatchlistPopup 为 true 时显示弹窗
     if (showWatchlistPopup.value) {
         DialogWindow(
             onCloseRequest = { showWatchlistPopup.value = false },
@@ -46,7 +44,12 @@ fun WatchlistScreen(
             resizable = false,
             state = watchlistWindowState
         ) {
-            // 记住列表滚动状态
+            // 核心修正：采用“组合拳”方案，彻底阻止窗口出现在任务切换器中
+            LaunchedEffect(window) {
+                window.modalExclusionType = Dialog.ModalExclusionType.APPLICATION_EXCLUDE
+                window.focusableWindowState = false
+            }
+
             val listState = rememberLazyListState()
 
             Column(
@@ -54,13 +57,11 @@ fun WatchlistScreen(
                     .fillMaxSize()
                     .clip(RoundedCornerShape(4.dp))
                     .background(Color.Black.copy(alpha = 0.7f))
-                    // 允许双击关闭弹窗
                     .combinedClickable(
                         onClick = {},
                         onDoubleClick = { showWatchlistPopup.value = false }
                     )
             ) {
-                // 显示最后更新时间
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -79,19 +80,17 @@ fun WatchlistScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                 ) {
-                    // 使用 LazyColumn 高效显示列表
                     LazyColumn(
                         state = listState,
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(horizontal = 4.dp)
-                            .height(watchlistWindowState.size.height) // 根据窗口高度限制列表高度
+                            .height(watchlistWindowState.size.height)
                     ) {
                         items(stockViewModel.watchlistData) { data ->
                             WatchlistRow(data)
                         }
                     }
-                    // 添加垂直滚动条
                     VerticalScrollbar(
                         modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
                         adapter = rememberScrollbarAdapter(scrollState = listState)
@@ -104,22 +103,18 @@ fun WatchlistScreen(
 
 /**
  * 自选股列表中的单行数据展示
- * @param data 单条股票数据
  */
 @Composable
 private fun WatchlistRow(data: StockData) {
-    // 使用 Row 布局来水平排列各个数据项
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 0.dp)) {
-        // 股票名称，使用 weight 实现弹性布局，自动填充可用空间
         Text(
             text = data.name,
             modifier = Modifier.weight(1f),
             color = Color.White,
             fontSize = 8.sp,
             textAlign = TextAlign.Start,
-            maxLines = 1 // 确保名称只显示一行
+            maxLines = 1
         )
-        // 股票代码，移除 'sh' 或 'sz' 前缀
         Text(
             text = data.code.removePrefix("sh").removePrefix("sz"),
             modifier = Modifier.weight(1f),
@@ -128,7 +123,6 @@ private fun WatchlistRow(data: StockData) {
             fontFamily = FontFamily.Monospace,
             textAlign = TextAlign.Start
         )
-        // 当前价格
         Text(
             text = "%.2f".format(data.price),
             modifier = Modifier.weight(1.1f),
