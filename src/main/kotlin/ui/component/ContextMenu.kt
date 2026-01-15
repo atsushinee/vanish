@@ -7,9 +7,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
@@ -66,58 +66,66 @@ fun ContextMenu(
                             println("菜单背景被点击，已关闭")
                         })
                     },
-                horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // “历史”按钮
-                IconButton(onClick = {
-                    onShowHistory()
-                    showContextMenu.value = false
-                    println("历史按钮点击")
-                }) {
-                    Icon(
-                        Icons.Default.History,
-                        "历史",
-                        tint = Color.White,
-                        modifier = Modifier.size(12.dp)
-                    )
+                Row(
+                    modifier = Modifier.weight(12f),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // “历史”按钮
+                    IconButton(modifier = Modifier.size(12.dp), onClick = {
+                        onShowHistory()
+                        showContextMenu.value = false
+                        println("历史按钮点击")
+                    }) {
+                        Icon(
+                            Icons.Default.History,
+                            "历史",
+                            tint = Color.White,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    // “自选列表”按钮
+                    IconButton(modifier = Modifier.size(12.dp), onClick = {
+                        onShowWatchlist()
+                        showContextMenu.value = false
+                        println("自选列表按钮点击")
+                    }) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.List,
+                            "自选列表",
+                            tint = Color.White,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    IconButton(modifier = Modifier.size(12.dp), onClick = {
+                        onShowTimeShare()
+                        showContextMenu.value = false
+                        println("分时图按钮点击")
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.Timeline,
+                            contentDescription = "分时图",
+                            tint = Color.White,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
-                // “自选列表”按钮
-                IconButton(onClick = {
-                    onShowWatchlist()
-                    showContextMenu.value = false
-                    println("自选列表按钮点击")
-                }) {
-                    Icon(
-                        Icons.Default.List,
-                        "自选列表",
-                        tint = Color.White,
-                        modifier = Modifier.size(12.dp)
-                    )
-                }
-                // 核心修正：将分时图的触发器从文字按钮改为图标按钮
-                // 原理：使用 IconButton 和 Icon 组件，选择一个能代表“图表”或“时间线”的图标（如 Timeline），以实现UI风格的统一。
-                // 注意：contentDescription 是为辅助功能服务的，对视力正常的用来说不可见，但良好的实践是提供它。
-                IconButton(onClick = {
-                    onShowTimeShare()
-                    showContextMenu.value = false
-                    println("分时图按钮点击")
-                }) {
-                    Icon(
-                        imageVector = Icons.Default.Timeline, // 使用 Timeline 图标，更形象
-                        contentDescription = "分时图",
-                        tint = Color.White,
-                        modifier = Modifier.size(12.dp)
-                    )
-                }
-                // “关闭”按钮
-                IconButton(onClick = onCloseRequest) {
-                    Icon(
-                        Icons.Default.Close,
-                        "关闭",
-                        tint = Color.White,
-                        modifier = Modifier.size(12.dp)
-                    )
+                Row(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // “关闭”按钮
+                    IconButton(modifier = Modifier.size(6.dp), onClick = onCloseRequest) {
+                        Icon(
+                            Icons.Default.Close,
+                            "关闭",
+                            tint = Color.White,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
             }
         }

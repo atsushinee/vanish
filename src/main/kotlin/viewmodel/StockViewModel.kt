@@ -4,7 +4,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import config.AppConfig
 import data.model.StockData
-import data.remote.getSinaBatchRealtimeData
+import data.remote.api.getSinaBatchRealtimeData
 import kotlinx.coroutines.*
 import java.time.LocalDateTime
 import java.time.LocalTime

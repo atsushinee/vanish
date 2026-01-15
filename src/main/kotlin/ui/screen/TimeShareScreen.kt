@@ -11,10 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.material.darkColors
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -26,24 +23,37 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogState
 import androidx.compose.ui.window.DialogWindow
 import data.model.TimeSharePoint
+import kotlinx.coroutines.delay
 import viewmodel.TimeShareUiState
 import viewmodel.TimeShareViewModel
 import kotlin.math.max
 
 /**
- * 核心重构：将此 Composable 重新定义为“屏幕”（Screen）。
- * 目的：统一项目架构，明确其作为独立UI展示单元的职责，为未来扩展（如日K、周K切换）做准备。
- * 原理：通过重命名文件和函数，并将其移动到 `ui.screen` 包下，使其在项目结构中的定位更加清晰。
+ * 分时图屏幕，负责展示股票的分钟级价格走势。
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun TimeShareScreen( // 函数名从 TimeShareWindow 改为 TimeShareScreen
+fun TimeShareScreen(
     code: String,
     dialogState: DialogState,
     onCloseRequest: () -> Unit
 ) {
     val viewModel = remember(code) { TimeShareViewModel(code) }
     val uiState by viewModel.uiState.collectAsState()
+
+    // 核心修正：添加 LaunchedEffect 以实现定时刷新
+    // 原理：LaunchedEffect 将一个协程的生命周期与 Composable 的生命周期绑定。
+    //      当 TimeShareScreen 出现在屏幕上时，这个协程会自动启动；当它消失时，协程会自动取消。
+    //      `key1 = Unit` 表示这个 effect 只在 Composable 首次加载时运行一次。
+    LaunchedEffect(Unit) {
+        // 使用一个无限循环来持续刷新数据
+        while (true) {
+            // 调用 ViewModel 中的公共方法来加载最新数据
+            viewModel.loadTimeShareData()
+            // 使用 delay 函数挂起协程5秒钟，实现定时效果
+            delay(5000)
+        }
+    }
 
     DialogWindow(
         onCloseRequest = onCloseRequest,
@@ -90,7 +100,6 @@ private fun CenteredText(text: String, color: Color = Color.White) {
 
 /**
  * 分时图的绘制组件。
- * 未来可以扩展，根据传入的类型（如日K、周K）改变其绘制逻辑。
  */
 @Composable
 fun TimeShareChart(points: List<TimeSharePoint>, preClosePrice: Float) {

@@ -49,7 +49,8 @@ fun MainScreen(
     showContextMenu: MutableState<Boolean>,
     onShowHistory: () -> Unit,
     onShowWatchlist: () -> Unit,
-    onShowTimeShare: () -> Unit, // 新增参数
+    onShowTimeShare: () -> Unit,
+    onDoubleClick: () -> Unit,
     onCloseRequest: () -> Unit,
     onVisibilityChange: (Boolean) -> Unit
 ) {
@@ -110,7 +111,7 @@ fun MainScreen(
                                                 (currentPos - lastTapPosition).getDistance() <= tapTolerancePx
                                             ) {
                                                 // 触发双击事件，切换自选股列表的可见性
-                                                onShowWatchlist()
+                                                onDoubleClick()
                                                 lastTapTime = 0 // 重置时间，避免连续触发
                                             } else {
                                                 // 记录本次点击的时间和位置

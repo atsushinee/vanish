@@ -136,6 +136,10 @@ fun App(onExit: () -> Unit) {
             onShowHistory = { showHistoryPopup.value = !showHistoryPopup.value },
             onShowWatchlist = { showWatchlistPopup.value = !showWatchlistPopup.value },
             onShowTimeShare = { showTimeShareWindow.value = !showTimeShareWindow.value },
+            onDoubleClick = {
+                showWatchlistPopup.value = !showWatchlistPopup.value
+                showTimeShareWindow.value = false
+            },
             onCloseRequest = handleCloseRequest,
             onVisibilityChange = { isWindowVisible.value = it }
         )

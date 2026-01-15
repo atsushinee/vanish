@@ -1,7 +1,7 @@
 package viewmodel
 
 import data.model.TimeSharePoint
-import data.remote.getTimeShare
+import data.remote.api.getTimeShare
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,17 +22,23 @@ class TimeShareViewModel(private val code: String) {
 
     // 日志记录器
     private val logger = Logger.getLogger("TimeShareViewModel")
+    
+    // 创建一个在 ViewModel 生命周期内有效的协程作用域
+    private val viewModelScope = CoroutineScope(Dispatchers.IO)
 
     init {
         // ViewModel初始化时，立即在IO线程上加载数据
         loadTimeShareData()
     }
 
-    private fun loadTimeShareData() {
-        // 使用ViewModel的协程作用域，确保协程在ViewModel销毁时自动取消
-        CoroutineScope(Dispatchers.IO).launch {
+    /**
+     * 公共方法，用于加载或刷新分时数据。
+     */
+    fun loadTimeShareData() {
+        // 在 ViewModel 的作用域内启动协程
+        viewModelScope.launch {
             try {
-                // 调用API获取分时数据
+                // 核心修正：从新的API文件中导入和调用 getTimeShare
                 val response = getTimeShare(code)
                 val dataContainer = response?.data
                 if (dataContainer == null || dataContainer.trends.isEmpty()) {
