@@ -1,11 +1,8 @@
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogState
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberDialogState
-import androidx.compose.ui.window.rememberWindowState
 import config.AppConfig
 import ui.component.TrayMenu
 import ui.screen.HistoryScreen
@@ -17,7 +14,6 @@ import viewmodel.StockViewModel
 
 /**
  * 应用程序的主 Composable 函数，负责整体的结构和状态管理。
- * @param onExit 一个回调函数，用于在需要时触发应用程序的退出逻辑。
  */
 @Composable
 fun App(onExit: () -> Unit) {
@@ -29,8 +25,10 @@ fun App(onExit: () -> Unit) {
     val initialX = AppConfig.windowX
     val initialY = AppConfig.windowY
 
-    // 记住主窗口的状态（大小、位置）
-    val windowState = rememberWindowState(
+    // 核心修正：将主窗口的 State 从 rememberWindowState 改为 rememberDialogState
+    // 原理：使用 DialogState 来管理主UI，这样它在渲染时就可以被放入一个 Dialog 中，从而避免在任务栏显示图标。
+    //      其 API 与 WindowState 高度兼容，可以无缝替换。
+    val mainDialogState = rememberDialogState(
         size = androidx.compose.ui.unit.DpSize(virtualWidth * initialScale, virtualHeight * initialScale),
         position = WindowPosition(initialX.dp, initialY.dp)
     )
@@ -53,13 +51,12 @@ fun App(onExit: () -> Unit) {
     val timeShareDialogState = rememberDialogState(size = androidx.compose.ui.unit.DpSize(200.dp, 70.dp))
 
 
-    // 定义关闭应用程序时的处理逻辑
+    // 核心修正：更新关闭逻辑，使其从 mainDialogState 中读取位置
     val handleCloseRequest = {
-        val currentPosition = windowState.position
-        if (currentPosition is WindowPosition.Absolute) {
-            AppConfig.windowX = currentPosition.x.value
-            AppConfig.windowY = currentPosition.y.value
-        }
+        val currentPosition = mainDialogState.position
+        // 注意：DialogState 的位置不是 Absolute，所以这里不需要 is WindowPosition.Absolute 的判断
+        AppConfig.windowX = currentPosition.x.value
+        AppConfig.windowY = currentPosition.y.value
         AppConfig.save()
         onExit()
     }
@@ -70,32 +67,32 @@ fun App(onExit: () -> Unit) {
         if (!isWindowVisible.value) {
             showHistoryPopup.value = false
             showWatchlistPopup.value = false
-            showTimeShareWindow.value = false // 隐藏主窗口时也隐藏分时图
+            showTimeShareWindow.value = false
         }
     }
 
-    // 当主窗口位置变化时，同步更新所有对话框的位置
-    LaunchedEffect(windowState.position, windowState.size) {
-        val currentPosition = windowState.position
-        if (currentPosition is WindowPosition.Absolute) {
-            // 更新历史记录窗口位置
-            val historyY = currentPosition.y - historyWindowState.size.height - 4.dp
-            val historyX = currentPosition.x + (windowState.size.width - historyWindowState.size.width) / 2
-            historyWindowState.position = WindowPosition(x = historyX, y = historyY)
+    // 核心修正：更新位置同步逻辑，使其依赖于 mainDialogState
+    // 原理：将 LaunchedEffect 的 key 从 windowState.position 改为 mainDialogState.position，
+    //      并从 mainDialogState 中读取位置和大小来计算其他对话框的位置。
+    LaunchedEffect(mainDialogState.position, mainDialogState.size) {
+        val currentPosition = mainDialogState.position
+        // 更新历史记录窗口位置
+        val historyY = currentPosition.y - historyWindowState.size.height - 4.dp
+        val historyX = currentPosition.x + (mainDialogState.size.width - historyWindowState.size.width) / 2
+        historyWindowState.position = WindowPosition(x = historyX, y = historyY)
 
-            // 更新自选列表窗口位置
-            val watchlistY = currentPosition.y - watchlistWindowState.size.height - 4.dp
-            val watchlistX = currentPosition.x + (windowState.size.width - watchlistWindowState.size.width) / 2
-            watchlistWindowState.position = WindowPosition(x = watchlistX, y = watchlistY)
+        // 更新自选列表窗口位置
+        val watchlistY = currentPosition.y - watchlistWindowState.size.height - 4.dp
+        val watchlistX = currentPosition.x + (mainDialogState.size.width - watchlistWindowState.size.width) / 2
+        watchlistWindowState.position = WindowPosition(x = watchlistX, y = watchlistY)
 
-            // 更新分时图窗口位置
-            val timeShareY = currentPosition.y - timeShareDialogState.size.height - 4.dp
-            val timeShareX = currentPosition.x + (windowState.size.width - timeShareDialogState.size.width) / 2
-            timeShareDialogState.position = WindowPosition(x = timeShareX, y = timeShareY)
-        }
+        // 更新分时图窗口位置
+        val timeShareY = currentPosition.y - timeShareDialogState.size.height - 4.dp
+        val timeShareX = currentPosition.x + (mainDialogState.size.width - timeShareDialogState.size.width) / 2
+        timeShareDialogState.position = WindowPosition(x = timeShareX, y = timeShareY)
     }
 
-    // 监听自选股弹窗的可见性变化，以启动或停止数据监控
+    // 监听自选股弹窗的可见性变化
     LaunchedEffect(showWatchlistPopup.value) {
         if (showWatchlistPopup.value) {
             stockViewModel.startWatchlistMonitor()
@@ -126,8 +123,9 @@ fun App(onExit: () -> Unit) {
 
     // 主窗口渲染
     if (isWindowVisible.value) {
+        // 核心修正：将 mainDialogState 传递给 MainScreen
         MainScreen(
-            windowState = windowState,
+            dialogState = mainDialogState,
             stockData = stockData,
             virtualWidth = virtualWidth,
             virtualHeight = virtualHeight,
@@ -159,8 +157,7 @@ fun App(onExit: () -> Unit) {
         watchlistWindowState = watchlistWindowState
     )
 
-    // 核心修正：调用重命名和移动后的 TimeShareScreen
-    // 原理：更新 import 语句和函数调用，以匹配新的文件结构和命名约定。
+    // 分时图弹窗
     if (showTimeShareWindow.value && stockData != null) {
         TimeShareScreen(
             code = stockData.code,
