@@ -11,6 +11,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import data.model.StockData
+import util.color
 
 @Composable
 fun StockInfo(stockData: StockData?) {
@@ -27,11 +28,7 @@ fun StockInfo(stockData: StockData?) {
         )
         Text(
             text = stockData?.changePercent?.let { "%.2f%%".format(it) } ?: "--.--%",
-            color = when {
-                stockData == null -> Color.White
-                stockData.changePercent >= 0 -> Color(0xFFd81e06)
-                else -> Color(0xFF1aad19)
-            },
+            color = stockData?.changePercent.color(),
             fontSize = 8.sp,
             fontFamily = FontFamily.Monospace
         )
@@ -48,11 +45,7 @@ fun StockInfo(stockData: StockData?) {
 //        )
         Text(
             text = stockData?.indexPercent?.let { "%.2f%%".format(it) } ?: "--.--%",
-            color = when {
-                stockData == null -> Color.White
-                stockData.indexPercent >= 0 -> Color(0xFFd81e06)
-                else -> Color(0xFF1aad19)
-            },
+            color = stockData?.indexPercent.color(),
             fontSize = 8.sp,
             fontFamily = FontFamily.Monospace
         )

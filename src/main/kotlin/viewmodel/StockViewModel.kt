@@ -70,6 +70,7 @@ class StockViewModel {
                     fetchWatchlistData()
                     if (!inTradingTime) hasFetchedOnceOutOfHours = true
                 }
+                delay(1000)
             }
         }
     }
@@ -108,7 +109,7 @@ class StockViewModel {
                 fetchRealtimeData()
                 if (!inTradingTime) hasFetchedOnceOutOfHours = true
             }
-            delay(2000L)
+            delay(1000L)
         }
     }
 

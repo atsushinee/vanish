@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogState
 import androidx.compose.ui.window.DialogWindow
 import data.model.StockData
+import util.color
 import viewmodel.StockViewModel
 import java.time.format.DateTimeFormatter
 
@@ -125,32 +126,26 @@ private fun HistoryRow(data: StockData) {
             fontFamily = FontFamily.Monospace,
             textAlign = TextAlign.End
         )
-        // 根据涨跌幅的正负决定颜色
-        val changeColor = if (data.changePercent >= 0) Color(0xFFd81e06) else Color(0xFF1aad19)
         Text(
             text = "%.2f%%".format(data.changePercent),
             modifier = Modifier.width(46.dp),
-            color = changeColor,
+            color = data.changePercent.color(),
             fontSize = 11.sp,
             fontFamily = FontFamily.Monospace,
             textAlign = TextAlign.End
         )
-        // 根据涨速的正负决定颜色
-        val riseColor = if (data.rise >= 0) Color(0xFFd81e06) else Color(0xFF1aad19)
         Text(
             text = "%.2f%%".format(data.rise),
             modifier = Modifier.width(41.dp),
-            color = riseColor,
+            color = data.rise.color(),
             fontSize = 11.sp,
             fontFamily = FontFamily.Monospace,
             textAlign = TextAlign.End
         )
-        // 根据对应指数涨跌幅的正负决定颜色
-        val indexColor = if (data.indexPercent >= 0) Color(0xFFd81e06) else Color(0xFF1aad19)
         Text(
             text = "%.2f%%".format(data.indexPercent),
             modifier = Modifier.width(41.dp),
-            color = indexColor,
+            color = data.indexPercent.color(),
             fontSize = 11.sp,
             fontFamily = FontFamily.Monospace,
             textAlign = TextAlign.End

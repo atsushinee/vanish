@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogState
 import androidx.compose.ui.window.DialogWindow
 import data.model.StockData
+import util.color
 import viewmodel.StockViewModel
 
 /**
@@ -136,22 +137,18 @@ private fun WatchlistRow(data: StockData) {
             fontFamily = FontFamily.Monospace,
             textAlign = TextAlign.End
         )
-        // 根据涨跌幅的正负决定颜色
-        val changeColor = if (data.changePercent >= 0) Color(0xFFd81e06) else Color(0xFF1aad19)
         Text(
             text = "%.2f%%".format(data.changePercent),
             modifier = Modifier.weight(1f),
-            color = changeColor,
+            color = data.changePercent.color(),
             fontSize = 10.sp,
             fontFamily = FontFamily.Monospace,
             textAlign = TextAlign.End
         )
-        // 根据涨速的正负决定颜色
-        val riseColor = if (data.rise >= 0) Color(0xFFd81e06) else Color(0xFF1aad19)
         Text(
             text = "%.2f%%".format(data.rise),
             modifier = Modifier.weight(1f),
-            color = riseColor,
+            color = data.rise.color(),
             fontSize = 10.sp,
             fontFamily = FontFamily.Monospace,
             textAlign = TextAlign.End
