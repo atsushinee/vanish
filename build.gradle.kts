@@ -3,6 +3,12 @@ import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 plugins {
     kotlin("jvm") version "1.9.23"
     id("org.jetbrains.compose") version "1.6.10"
+    // 核心修正：添加 Kotlinx Serialization 编译器插件
+    // 目的：这是解决 "Serializer not found" 异常的根本方法。
+    // 原理：此插件会在编译时扫描所有带 @Serializable 注解的类，并为它们自动生成序列化和反序列化所需的代码（即 Serializer）。
+    //      如果没有这个插件，Kotlin 编译器会完全忽略 @Serializable 注解，导致运行时 kotlinx.serialization 库找不到任何序列化器，从而抛出异常。
+    // 注意：插件的版本应与项目中的 Kotlin 版本保持一致或兼容。此处使用与 kotlin("jvm") 相同的版本 "1.9.23"。
+    id("org.jetbrains.kotlin.plugin.serialization") version "1.9.23"
 }
 
 group = "com.vanish"

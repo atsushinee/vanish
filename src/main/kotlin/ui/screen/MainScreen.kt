@@ -35,6 +35,7 @@ import ui.component.ContextMenu
  * @param showContextMenu 控制上下文菜单可见性的状态
  * @param onShowHistory 回调：当请求显示历史记录时触发
  * @param onShowWatchlist 回调：当请求显示自选股列表时触发
+ * @param onShowTimeShare 新增回调：当请求显示分时图时触发
  * @param onCloseRequest 回调：当请求关闭应用时触发
  * @param onVisibilityChange 回调：当窗口可见性需要改变时触发
  */
@@ -48,6 +49,7 @@ fun MainScreen(
     showContextMenu: MutableState<Boolean>,
     onShowHistory: () -> Unit,
     onShowWatchlist: () -> Unit,
+    onShowTimeShare: () -> Unit, // 新增参数
     onCloseRequest: () -> Unit,
     onVisibilityChange: (Boolean) -> Unit
 ) {
@@ -135,6 +137,7 @@ fun MainScreen(
                     initialScale = initialScale,
                     onShowHistory = onShowHistory,
                     onShowWatchlist = onShowWatchlist,
+                    onShowTimeShare = onShowTimeShare, // 传递回调
                     onCloseRequest = onCloseRequest
                 )
             }

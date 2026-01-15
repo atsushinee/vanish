@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.ui.Alignment
@@ -30,6 +31,7 @@ import androidx.compose.ui.window.Popup
  * @param initialScale 初始缩放比例
  * @param onShowHistory 回调：当点击“历史”按钮时触发
  * @param onShowWatchlist 回调：当点击“自选列表”按钮时触发
+ * @param onShowTimeShare 新增回调：当点击“分时图”按钮时触发
  * @param onCloseRequest 回调：当点击“关闭”按钮时触发
  */
 @Composable
@@ -40,6 +42,7 @@ fun ContextMenu(
     initialScale: Float,
     onShowHistory: () -> Unit,
     onShowWatchlist: () -> Unit,
+    onShowTimeShare: () -> Unit, // 新增参数
     onCloseRequest: () -> Unit
 ) {
     // 仅当 showContextMenu 为 true 时显示 Popup
@@ -88,6 +91,21 @@ fun ContextMenu(
                     Icon(
                         Icons.Default.List,
                         "自选列表",
+                        tint = Color.White,
+                        modifier = Modifier.size(12.dp)
+                    )
+                }
+                // 核心修正：将分时图的触发器从文字按钮改为图标按钮
+                // 原理：使用 IconButton 和 Icon 组件，选择一个能代表“图表”或“时间线”的图标（如 Timeline），以实现UI风格的统一。
+                // 注意：contentDescription 是为辅助功能服务的，对视力正常的用来说不可见，但良好的实践是提供它。
+                IconButton(onClick = {
+                    onShowTimeShare()
+                    showContextMenu.value = false
+                    println("分时图按钮点击")
+                }) {
+                    Icon(
+                        imageVector = Icons.Default.Timeline, // 使用 Timeline 图标，更形象
+                        contentDescription = "分时图",
                         tint = Color.White,
                         modifier = Modifier.size(12.dp)
                     )

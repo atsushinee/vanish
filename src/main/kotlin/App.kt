@@ -10,6 +10,7 @@ import config.AppConfig
 import ui.component.TrayMenu
 import ui.screen.HistoryScreen
 import ui.screen.MainScreen
+import ui.screen.TimeShareScreen
 import ui.screen.WatchlistScreen
 import util.TrayManager
 import viewmodel.StockViewModel
@@ -25,8 +26,6 @@ fun App(onExit: () -> Unit) {
     val virtualHeight = 30.dp
     val initialScale = 0.8f
 
-    // 目的: 通过 AppConfig 的类型安全属性获取窗口初始位置。
-    // 原理: 直接访问 AppConfig.windowX 和 AppConfig.windowY，它们返回 Float 类型，无需关心转换和默认值。
     val initialX = AppConfig.windowX
     val initialY = AppConfig.windowY
 
@@ -39,6 +38,7 @@ fun App(onExit: () -> Unit) {
     // 使用 MutableState 来管理所有需要在不同组件间共享的UI状态
     val showHistoryPopup = remember { mutableStateOf(false) }
     val showWatchlistPopup = remember { mutableStateOf(false) }
+    val showTimeShareWindow = remember { mutableStateOf(false) }
     val isWindowVisible = remember { mutableStateOf(true) }
     val showTrayMenu = remember { mutableStateOf(false) }
     val showContextMenu = remember { mutableStateOf(false) }
@@ -47,21 +47,19 @@ fun App(onExit: () -> Unit) {
     // 记住 ViewModel 的单一实例
     val stockViewModel = remember { StockViewModel() }
 
-    // 记住各个弹窗的状态
+    // 为各个对话框创建并记住 DialogState
     val historyWindowState = rememberDialogState(size = androidx.compose.ui.unit.DpSize(240.dp, 45.dp))
     val watchlistWindowState = rememberDialogState(size = androidx.compose.ui.unit.DpSize(200.dp, 70.dp))
+    val timeShareDialogState = rememberDialogState(size = androidx.compose.ui.unit.DpSize(200.dp, 70.dp))
+
 
     // 定义关闭应用程序时的处理逻辑
     val handleCloseRequest = {
         val currentPosition = windowState.position
         if (currentPosition is WindowPosition.Absolute) {
-            // 目的: 通过 AppConfig 的类型安全属性保存窗口位置。
-            // 原理: 直接为 AppConfig.windowX 和 AppConfig.windowY 赋值，其 setter 会处理持久化。
             AppConfig.windowX = currentPosition.x.value
             AppConfig.windowY = currentPosition.y.value
         }
-        // 目的: 统一调用 save 方法，将所有变更一次性写入文件。
-        // 注意: 这是确保所有配置（包括 ViewModel 中可能修改的）都被保存的关键。
         AppConfig.save()
         onExit()
     }
@@ -72,20 +70,28 @@ fun App(onExit: () -> Unit) {
         if (!isWindowVisible.value) {
             showHistoryPopup.value = false
             showWatchlistPopup.value = false
+            showTimeShareWindow.value = false // 隐藏主窗口时也隐藏分时图
         }
     }
 
-    // 当主窗口位置或大小变化时，自动调整弹窗的位置
+    // 当主窗口位置变化时，同步更新所有对话框的位置
     LaunchedEffect(windowState.position, windowState.size) {
         val currentPosition = windowState.position
         if (currentPosition is WindowPosition.Absolute) {
+            // 更新历史记录窗口位置
             val historyY = currentPosition.y - historyWindowState.size.height - 4.dp
             val historyX = currentPosition.x + (windowState.size.width - historyWindowState.size.width) / 2
             historyWindowState.position = WindowPosition(x = historyX, y = historyY)
 
+            // 更新自选列表窗口位置
             val watchlistY = currentPosition.y - watchlistWindowState.size.height - 4.dp
             val watchlistX = currentPosition.x + (windowState.size.width - watchlistWindowState.size.width) / 2
             watchlistWindowState.position = WindowPosition(x = watchlistX, y = watchlistY)
+
+            // 更新分时图窗口位置
+            val timeShareY = currentPosition.y - timeShareDialogState.size.height - 4.dp
+            val timeShareX = currentPosition.x + (windowState.size.width - timeShareDialogState.size.width) / 2
+            timeShareDialogState.position = WindowPosition(x = timeShareX, y = timeShareY)
         }
     }
 
@@ -129,6 +135,7 @@ fun App(onExit: () -> Unit) {
             showContextMenu = showContextMenu,
             onShowHistory = { showHistoryPopup.value = !showHistoryPopup.value },
             onShowWatchlist = { showWatchlistPopup.value = !showWatchlistPopup.value },
+            onShowTimeShare = { showTimeShareWindow.value = !showTimeShareWindow.value },
             onCloseRequest = handleCloseRequest,
             onVisibilityChange = { isWindowVisible.value = it }
         )
@@ -147,4 +154,14 @@ fun App(onExit: () -> Unit) {
         stockViewModel = stockViewModel,
         watchlistWindowState = watchlistWindowState
     )
+
+    // 核心修正：调用重命名和移动后的 TimeShareScreen
+    // 原理：更新 import 语句和函数调用，以匹配新的文件结构和命名约定。
+    if (showTimeShareWindow.value && stockData != null) {
+        TimeShareScreen(
+            code = stockData.code,
+            dialogState = timeShareDialogState,
+            onCloseRequest = { showTimeShareWindow.value = false }
+        )
+    }
 }
