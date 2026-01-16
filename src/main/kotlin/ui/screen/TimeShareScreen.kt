@@ -103,20 +103,34 @@ private fun CenteredText(text: String, color: Color = Color.White) {
  */
 @Composable
 fun TimeShareChart(points: List<TimeSharePoint>, preClosePrice: Float) {
+    // 定义上涨、下跌和中线的颜色
     val upColor = Color(0xFFd81e06)
     val downColor = Color(0xFF1aad19)
     val midLineColor = Color.Gray
 
-    Canvas(modifier = Modifier.fillMaxSize().padding(4.dp)) {
-        if (points.size < 2) return@Canvas
+    // Canvas是Compose中的一个可组合函数，它提供了一个可以在其中进行自定义2D图形绘制的区域。
+    // 我们在这里使用它来绘制分时图的背景网格和价格线。
+    // Modifier.padding用于在Canvas周围添加一些空间，以避免图形紧贴边缘。
+    Canvas(modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp, vertical = 4.dp)) {
+        if (points.isEmpty()) return@Canvas
 
-        val maxDiff = points.maxOf { max(it.price - preClosePrice, preClosePrice - it.price) }
+        // --- Y轴计算 ---
+        val maxDiff = points.maxOfOrNull { max(it.price - preClosePrice, preClosePrice - it.price) } ?: 0.01f
         val priceRange = (maxDiff * 2).coerceAtLeast(0.01f)
         val minPrice = preClosePrice - maxDiff
-
-        val xScale = size.width / (points.size - 1)
         val yScale = size.height / priceRange
 
+        // --- X轴计算 ---
+        // 1. 定义总分钟数：
+        //    集合竞价 (9:15-9:30) 15分钟 + 上午盘 (9:30-11:30) 120分钟 + 下午盘 (13:00-15:00) 120分钟 = 255分钟。
+        //    这为从9:15开始的数据提供了固定的时间轴。
+        val totalMinutes = 255f
+        // 2. 计算X轴的缩放比例：将Canvas的宽度映射到总交易分钟数上。
+        val xScale = size.width / totalMinutes
+
+        // --- 绘制背景网格 ---
+
+        // 绘制水平中线（昨日收盘价线）
         val midY = size.height / 2
         drawLine(
             color = midLineColor,
@@ -126,17 +140,49 @@ fun TimeShareChart(points: List<TimeSharePoint>, preClosePrice: Float) {
             pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 4f))
         )
 
+        // 定义时间刻度的分钟位置
+        // 分钟数是相对于9:15开始的总时长计算的。
+        val timeMarkersMinutes = listOf(
+            0,    // 9:15
+            15,   // 9:30
+            75,   // 10:30
+            135,  // 11:30/13:00
+            195,  // 14:00
+            255   // 15:00
+        )
+
+        // 遍历时间刻度，绘制所有垂直虚线，包括起始和结束位置。
+        timeMarkersMinutes.forEach { minute ->
+            val x = minute * xScale
+            drawLine(
+                color = midLineColor,
+                start = Offset(x, 0f),
+                end = Offset(x, size.height),
+                strokeWidth = 1f,
+                pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 4f))
+            )
+        }
+
+        // --- 绘制价格线 ---
+        // 检查是否有足够的数据点来绘制线条
+        if (points.size < 2) return@Canvas
+
+        // 遍历所有数据点，绘制价格走势
+        // 数据从9:15开始，因此第一个数据点（索引0）应绘制在图表的起始位置（x=0）。
         for (i in 0 until points.size - 1) {
             val p1 = points[i]
             val p2 = points[i + 1]
 
+            // 根据数据点在列表中的索引（代表时间流逝）计算x坐标。
             val x1 = i * xScale
             val y1 = size.height - (p1.price - minPrice) * yScale
             val x2 = (i + 1) * xScale
             val y2 = size.height - (p2.price - minPrice) * yScale
 
+            // 根据价格决定颜色
             val color = if (p2.price >= preClosePrice) upColor else downColor
 
+            // 绘制线段
             drawLine(
                 color = color,
                 start = Offset(x1, y1),
