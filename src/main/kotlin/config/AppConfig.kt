@@ -15,6 +15,7 @@ import java.util.*
 object AppConfig {
     // 配置文件路径
     private val configFile = File("config.properties")
+
     // Properties 对象，用于存储键值对
     private val properties = Properties()
 
@@ -28,6 +29,10 @@ object AppConfig {
     private const val KEY_UI_WINDOW_X = "ui.window.x"
     private const val KEY_UI_WINDOW_Y = "ui.window.y"
     //endregion
+
+    // AI 相关配置
+    private const val KEY_AI_GEMINI_APIKEY = "ai.gemini.apiKey"
+
 
     //region 默认值常量 (Default Value Constants)
     private const val DEFAULT_STOCK_TARGET = "sz002413"
@@ -90,16 +95,22 @@ object AppConfig {
      * getter/setter 内部处理 Float 与 String 之间的转换。
      */
     var windowX: Float
-        get() = privateGetProperty(KEY_UI_WINDOW_X, DEFAULT_UI_WINDOW_POS.toString()).toFloatOrNull() ?: DEFAULT_UI_WINDOW_POS
+        get() = privateGetProperty(KEY_UI_WINDOW_X, DEFAULT_UI_WINDOW_POS.toString()).toFloatOrNull()
+            ?: DEFAULT_UI_WINDOW_POS
         set(value) = privateSetProperty(KEY_UI_WINDOW_X, value.toString())
 
     /**
      * 窗口的 Y 坐标。
      */
     var windowY: Float
-        get() = privateGetProperty(KEY_UI_WINDOW_Y, DEFAULT_UI_WINDOW_POS.toString()).toFloatOrNull() ?: DEFAULT_UI_WINDOW_POS
+        get() = privateGetProperty(KEY_UI_WINDOW_Y, DEFAULT_UI_WINDOW_POS.toString()).toFloatOrNull()
+            ?: DEFAULT_UI_WINDOW_POS
         set(value) = privateSetProperty(KEY_UI_WINDOW_Y, value.toString())
 
+
+    var geminiApiKey: String
+        get() = privateGetProperty(KEY_AI_GEMINI_APIKEY, "")
+        set(value) = privateSetProperty(KEY_AI_GEMINI_APIKEY, value)
     //endregion
 
     //region 私有持久化方法 (Private Persistence Methods)

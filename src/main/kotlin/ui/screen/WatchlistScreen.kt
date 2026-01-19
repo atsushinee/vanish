@@ -133,7 +133,7 @@ private fun WatchlistRow(data: StockData) {
         )
         Text(
             text = "%.2f%%".format(data.changePercent),
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1.1f),
             color = data.changePercent.color(),
             fontSize = 10.sp,
             fontFamily = FontFamily.Monospace,
