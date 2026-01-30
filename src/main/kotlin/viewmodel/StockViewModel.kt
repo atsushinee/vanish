@@ -10,6 +10,7 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Collections
 import java.util.logging.FileHandler
 import java.util.logging.Logger
 import java.util.logging.SimpleFormatter
@@ -192,7 +193,13 @@ class StockViewModel {
      * 批量获取自选股列表的实时行情数据并更新UI状态。
      */
     private suspend fun fetchWatchlistData() {
-        if (watchlistCodes.isEmpty()) return
+        if (watchlistCodes.isEmpty()) {
+            // 如果自选股列表为空，确保UI也为空
+            if (watchlistData.isNotEmpty()) {
+                watchlistData.clear()
+            }
+            return
+        }
 
         try {
             val codes = watchlistCodes.joinToString(",")
@@ -244,14 +251,24 @@ class StockViewModel {
                     }
                 }.associateBy { it.code }
 
+            // 按照 watchlistCodes 的顺序来构建最终的列表
             val updatedList = watchlistCodes.mapNotNull { code -> newStockDataMap[code] }
 
-            if (watchlistData != updatedList) {
+            // 修复：由于StockData是数据类，其属性是val，不能重新赋值。
+            // 正确的做法是，如果列表的顺序或成员发生变化，就用新列表完全替换旧列表。
+            // `mutableStateListOf` 会高效地处理UI更新。
+            if (watchlistData.map { it.code } != updatedList.map { it.code } || watchlistData.size != updatedList.size) {
                 watchlistData.clear()
                 watchlistData.addAll(updatedList)
-                val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
-                lastUpdateTime.value = "${LocalDateTime.now().format(formatter)}"
+            } else {
+                // 如果代码列表和顺序都相同，我们创建一个新的StockData对象列表来替换旧的，
+                // 以确保即使是相同的数据，时间戳等也能更新，并触发UI重绘。
+                watchlistData.clear()
+                watchlistData.addAll(updatedList)
             }
+
+            val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+            lastUpdateTime.value = "${LocalDateTime.now().format(formatter)}"
 
         } catch (e: Exception) {
             logger.severe("[自选股数据异常]: 获取自选股实时数据时发生未知异常: ${e.message}")
@@ -281,11 +298,11 @@ class StockViewModel {
     fun addWatchlistCode(code: String) {
         if (code.isNotBlank() && !watchlistCodes.contains(code)) {
             watchlistCodes.add(code)
-            // 目的: 通过 AppConfig 的类型安全属性更新自选股列表。
-            // 原理: 直接将 ViewModel 中的列表赋值给 AppConfig.watchlist，其 setter 会处理序列化和持久化。
             AppConfig.watchlist = watchlistCodes.toList()
             AppConfig.save()
             logger.info("[自选股配置]: 添加新自选股 $code 并已保存。")
+            // 立即刷新数据
+            viewModelScope.launch { fetchWatchlistData() }
         }
     }
 
@@ -295,11 +312,11 @@ class StockViewModel {
      */
     fun removeWatchlistCode(code: String) {
         if (watchlistCodes.remove(code)) {
-            // 目的: 同样通过类型安全的属性来更新配置。
-            // 原理: 将修改后的列表重新赋值给 AppConfig.watchlist。
             AppConfig.watchlist = watchlistCodes.toList()
             AppConfig.save()
             logger.info("[自选股配置]: 移除自选股 $code 并已保存。")
+            // 立即刷新数据
+            viewModelScope.launch { fetchWatchlistData() }
         }
     }
 
@@ -308,16 +325,28 @@ class StockViewModel {
      * @param newCode 新的股票代码
      */
     fun switchTargetStock(newCode: String) {
-        // 目的: 更新应用配置中的目标股票代码。
-        // 原理: 直接为 AppConfig 的类型安全属性 targetStock 赋值。
         AppConfig.targetStock = newCode
-        // 目的: 将变更持久化到配置文件。
-        // 原理: 调用 AppConfig 的 save 方法，将当前所有配置写入磁盘。
         AppConfig.save()
         logger.info("[主窗口]: 切换监控目标为 $newCode 并已保存配置。")
-
-        // 目的: 立即刷新主窗口的股票数据，而不是等待下一个轮询周期。
-        // 原理: 调用 refresh 方法，该方法会启动一个协程来执行 fetchRealtimeData，从而更新 UI。
         refresh()
+    }
+
+    /**
+     * 重新排序自选股列表并保存。
+     * @param from 原位置索引
+     * @param to   新位置索引
+     */
+    fun reorderWatchlist(from: Int, to: Int) {
+        if (from in watchlistCodes.indices && to in watchlistCodes.indices && from != to) {
+            // 在内存中对代码列表和数据列表同时进行排序，以保持UI同步
+            Collections.swap(watchlistCodes, from, to)
+            if (from < watchlistData.size && to < watchlistData.size) {
+                Collections.swap(watchlistData, from, to)
+            }
+
+            AppConfig.watchlist = watchlistCodes.toList()
+            AppConfig.save()
+            logger.info("[自选股配置]: 自选股列表顺序已更新并保存。")
+        }
     }
 }

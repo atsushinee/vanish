@@ -1,21 +1,35 @@
 package ui.screen
 
 import androidx.compose.foundation.*
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material.Icon
 import androidx.compose.material.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.onPointerEvent
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -24,7 +38,7 @@ import androidx.compose.ui.window.DialogWindow
 import data.model.StockData
 import util.color
 import viewmodel.StockViewModel
-import java.awt.Dialog
+import kotlin.math.abs
 
 /**
  * 自选股列表弹窗
@@ -37,6 +51,8 @@ fun WatchlistScreen(
     watchlistWindowState: DialogState
 ) {
     if (showWatchlistPopup.value) {
+        var showAddBar by remember { mutableStateOf(false) }
+
         DialogWindow(
             onCloseRequest = { showWatchlistPopup.value = false },
             undecorated = true,
@@ -45,136 +61,252 @@ fun WatchlistScreen(
             resizable = false,
             state = watchlistWindowState
         ) {
-            // 核心修正：采用“组合拳”方案，彻底阻止窗口出现在任务切换器中
-            LaunchedEffect(window) {
-                window.modalExclusionType = Dialog.ModalExclusionType.APPLICATION_EXCLUDE
-                window.focusableWindowState = false
+            // 动态切换窗口的可聚焦状态，以便输入框可以工作
+            LaunchedEffect(window, showAddBar) {
+                window.setFocusableWindowState(showAddBar)
             }
-
-            val listState = rememberLazyListState()
 
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .clip(RoundedCornerShape(4.dp))
                     .background(Color.Black.copy(alpha = 0.7f))
-                    .combinedClickable(
-                        onClick = {},
-                        onDoubleClick = { showWatchlistPopup.value = false }
-                    )
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 4.dp, vertical = 1.dp),
-                    contentAlignment = Alignment.CenterStart
+                // 顶部操作栏
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // 左侧的更新时间
                     Text(
                         text = stockViewModel.lastUpdateTime.value,
                         color = Color.LightGray,
                         fontSize = 7.sp,
                         fontFamily = FontFamily.Monospace
                     )
+                    // 使用带 weight 的 Spacer 将右侧内容推到最右边
+                    Spacer(Modifier.weight(1f))
+
+                    // 右侧根据状态决定显示 "+" 按钮还是输入栏
+                    if (showAddBar) {
+                        AddStockBar(
+                            onConfirm = { code ->
+                                stockViewModel.addWatchlistCode(code)
+                                showAddBar = false
+                            },
+                            onDismiss = { showAddBar = false }
+                        )
+                    } else {
+                        // 核心修复：使用 Icon 替换 Text
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "添加",
+                            tint = Color.White,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .clickable { showAddBar = true }
+                                .padding(0.dp) // 为图标提供一些内边距，方便点击
+                                .size(8.dp) // 控制图标大小
+                        )
+                    }
                 }
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                ) {
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 4.dp)
-                            .height(watchlistWindowState.size.height)
-                    ) {
-                        items(stockViewModel.watchlistData) { data ->
-                            // 核心修改：为每一行数据绑定点击事件
-                            WatchlistRow(
-                                data = data,
-                                onClick = {
-                                    // 1. 调用ViewModel切换主窗口的股票
-                                    stockViewModel.switchTargetStock(data.code)
-                                    // 2. 关闭自选股弹窗
-                                    showWatchlistPopup.value = false
-                                }
-                            )
-                        }
-                    }
-                    VerticalScrollbar(
-                        modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
-                        adapter = rememberScrollbarAdapter(scrollState = listState)
-                    )
-                }
+                // 可拖拽排序的自选股列表
+                DraggableWatchlist(stockViewModel, showWatchlistPopup)
             }
         }
     }
 }
 
 /**
- * 自选股列表中的单行数据展示
+ * 极简风格的顶部股票代码输入栏，使用 Material Design 图标
  */
+@Composable
+private fun AddStockBar(onConfirm: (String) -> Unit, onDismiss: () -> Unit) {
+    var code by remember { mutableStateOf("") }
+    val textStyle = TextStyle(color = Color.White, fontSize = 6.sp, lineHeight = 6.sp, fontWeight = FontWeight.Bold)
+    val focusRequester = remember { FocusRequester() }
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+//            .height(16.dp)
+            .clip(RoundedCornerShape(4.dp))
+            .background(Color.Black.copy(alpha = 0.5f))
+            .padding(horizontal = 0.dp)
+    ) {
+        BasicTextField(
+            value = code,
+            // 限制输入长度不超过8位
+            onValueChange = { if (it.length <= 8) code = it },
+            // 使用固定宽度替换 weight，以缩短输入框
+            modifier = Modifier.width(35.dp).padding(start = 2.dp).focusRequester(focusRequester),
+            textStyle = textStyle,
+            singleLine = true,
+            cursorBrush = SolidColor(Color.White),
+            decorationBox = { innerTextField ->
+                Box(contentAlignment = Alignment.CenterStart) {
+                    if (code.isEmpty()) {
+                        Text("", style = textStyle.copy(color = Color.Gray))
+                    }
+                    innerTextField()
+                }
+            }
+        )
+        // 使用 Icon 替换 Text
+        Icon(
+            imageVector = Icons.Default.Check,
+            contentDescription = "确定",
+            tint = if (code.isNotBlank()) Color(0xFF1aad19) else Color.Gray,
+            modifier = Modifier
+                .padding(start = 2.dp)
+                .size(8.dp)
+                .clickable(enabled = code.isNotBlank()) { onConfirm(code) }
+        )
+        // 使用 Icon 替换 Text
+        Icon(
+            imageVector = Icons.Default.Close,
+            contentDescription = "取消",
+            tint = Color(0xFFd81e06),
+            modifier = Modifier
+                .padding(start = 4.dp)
+                .size(8.dp)
+                .clickable { onDismiss() }
+        )
+    }
+
+    // 当输入栏显示时，立即请求焦点
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+    }
+}
+
+
+@Composable
+private fun DraggableWatchlist(
+    stockViewModel: StockViewModel,
+    showWatchlistPopup: MutableState<Boolean>
+) {
+    val listState = rememberLazyListState()
+    var draggedItemIndex by remember { mutableStateOf<Int?>(null) }
+    var dragAmount by remember { mutableStateOf(0f) }
+
+    Box(modifier = Modifier.fillMaxWidth()) {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 4.dp)
+        ) {
+            itemsIndexed(stockViewModel.watchlistData, key = { _, data -> data.code }) { index, data ->
+                val isBeingDragged = index == draggedItemIndex
+
+                Box(
+                    modifier = Modifier
+                        .pointerInput(Unit) {
+                            detectDragGesturesAfterLongPress(
+                                onDragStart = {
+                                    draggedItemIndex = index
+                                },
+                                onDragEnd = {
+                                    draggedItemIndex?.let { fromIndex ->
+                                        val fromItem =
+                                            listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == fromIndex }
+                                        if (fromItem != null) {
+                                            val finalDraggedItemCenter =
+                                                fromItem.offset + fromItem.size / 2 + dragAmount
+                                            val toItem = listState.layoutInfo.visibleItemsInfo
+                                                .filterNot { it.index == fromIndex }
+                                                .minByOrNull { abs((it.offset + it.size / 2) - finalDraggedItemCenter) }
+
+                                            if (toItem != null) {
+                                                stockViewModel.reorderWatchlist(fromIndex, toItem.index)
+                                            }
+                                        }
+                                    }
+                                    draggedItemIndex = null
+                                    dragAmount = 0f
+                                },
+                                onDragCancel = {
+                                    draggedItemIndex = null
+                                    dragAmount = 0f
+                                },
+                                onDrag = { change, dragDelta ->
+                                    change.consume()
+                                    dragAmount += dragDelta.y
+                                }
+                            )
+                        }
+                        .graphicsLayer {
+                            translationY = if (isBeingDragged) dragAmount else 0f
+                            shadowElevation = if (isBeingDragged) 8f else 0f
+                        }
+                        .fillMaxWidth()
+                ) {
+                    WatchlistRow(
+                        data = data,
+                        onClick = {
+                            if (draggedItemIndex == null) {
+                                stockViewModel.switchTargetStock(data.code)
+                                showWatchlistPopup.value = false
+                            }
+                        }
+                    )
+                }
+            }
+        }
+        VerticalScrollbar(
+            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
+            adapter = rememberScrollbarAdapter(scrollState = listState)
+        )
+    }
+}
+
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun WatchlistRow(data: StockData, onClick: () -> Unit) {
-    // 1. 创建一个状态来追踪鼠标是否悬停在当前行上
     var isHovered by remember { mutableStateOf(false) }
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
-            .padding(vertical = 0.dp)
-            // 2. 根据 isHovered 状态动态改变背景色
-            //    原理: 当 isHovered 为 true 时，应用一个半透明的灰色背景，否则背景透明。
             .background(if (isHovered) Color.Gray.copy(alpha = 0.3f) else Color.Transparent)
-            // 3. 添加点击事件处理器
-            //    原理: clickable 修饰符使整个 Row 区域都可以响应点击，并执行传入的 onClick lambda。
-            .clickable { onClick() }
-            // 4. 使用 onPointerEvent 监听鼠标的进入和退出事件
-            //    原理: PointerEventType.Enter 事件在鼠标光标进入组件区域时触发，我们将 isHovered 设为 true。
-            //          PointerEventType.Exit 事件在鼠标光标离开时触发，我们将 isHovered 设为 false。
-            //          这是一种实现Hover效果的高效方式。
+            .clickable(onClick = onClick)
             .onPointerEvent(PointerEventType.Enter) { isHovered = true }
             .onPointerEvent(PointerEventType.Exit) { isHovered = false }
             .fillMaxWidth()
+            .padding(vertical = 0.dp)
     ) {
+        Text(data.name, Modifier.weight(1f), Color.White, 8.sp, textAlign = TextAlign.Start, maxLines = 1)
         Text(
-            text = data.name,
-            modifier = Modifier.weight(1f),
-            color = Color.White,
-            fontSize = 8.sp,
-            textAlign = TextAlign.Start,
-            maxLines = 1
-        )
-        Text(
-            text = data.code.removePrefix("sh").removePrefix("sz"),
-            modifier = Modifier.weight(1f),
-            color = Color.LightGray,
-            fontSize = 10.sp,
+            data.code.removePrefix("sh").removePrefix("sz"),
+            Modifier.weight(1f),
+            Color.LightGray,
+            10.sp,
             fontFamily = FontFamily.Monospace,
             textAlign = TextAlign.Start
         )
         Text(
-            text = "%.2f".format(data.price),
-            modifier = Modifier.weight(1.1f),
-            color = Color.White,
-            fontSize = 10.sp,
+            "%.2f".format(data.price),
+            Modifier.weight(1.1f),
+            Color.White,
+            10.sp,
             fontFamily = FontFamily.Monospace,
             textAlign = TextAlign.End
         )
         Text(
-            text = "%.2f%%".format(data.changePercent),
-            modifier = Modifier.weight(1.1f),
-            color = data.changePercent.color(),
-            fontSize = 10.sp,
+            "%.2f%%".format(data.changePercent),
+            Modifier.weight(1.1f),
+            data.changePercent.color(),
+            10.sp,
             fontFamily = FontFamily.Monospace,
             textAlign = TextAlign.End
         )
         Text(
-            text = "%.2f%%".format(data.rise),
-            modifier = Modifier.weight(1f),
-            color = data.rise.color(),
-            fontSize = 10.sp,
+            "%.2f%%".format(data.rise),
+            Modifier.weight(1f),
+            data.rise.color(),
+            10.sp,
             fontFamily = FontFamily.Monospace,
             textAlign = TextAlign.End
         )
