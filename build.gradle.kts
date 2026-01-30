@@ -39,6 +39,7 @@ dependencies {
     implementation("ch.qos.logback:logback-classic:1.4.14")
 
     implementation("com.google.genai:google-genai:1.35.0")
+    implementation("com.volcengine:volcengine-java-sdk-ark-runtime:1.0.6")
     implementation(compose.materialIconsExtended)
 }
 
