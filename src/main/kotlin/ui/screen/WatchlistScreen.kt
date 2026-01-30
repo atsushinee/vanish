@@ -7,13 +7,14 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -88,7 +89,16 @@ fun WatchlistScreen(
                             .height(watchlistWindowState.size.height)
                     ) {
                         items(stockViewModel.watchlistData) { data ->
-                            WatchlistRow(data)
+                            // 核心修改：为每一行数据绑定点击事件
+                            WatchlistRow(
+                                data = data,
+                                onClick = {
+                                    // 1. 调用ViewModel切换主窗口的股票
+                                    stockViewModel.switchTargetStock(data.code)
+                                    // 2. 关闭自选股弹窗
+                                    showWatchlistPopup.value = false
+                                }
+                            )
                         }
                     }
                     VerticalScrollbar(
@@ -104,9 +114,30 @@ fun WatchlistScreen(
 /**
  * 自选股列表中的单行数据展示
  */
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
-private fun WatchlistRow(data: StockData) {
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 0.dp)) {
+private fun WatchlistRow(data: StockData, onClick: () -> Unit) {
+    // 1. 创建一个状态来追踪鼠标是否悬停在当前行上
+    var isHovered by remember { mutableStateOf(false) }
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .padding(vertical = 0.dp)
+            // 2. 根据 isHovered 状态动态改变背景色
+            //    原理: 当 isHovered 为 true 时，应用一个半透明的灰色背景，否则背景透明。
+            .background(if (isHovered) Color.Gray.copy(alpha = 0.3f) else Color.Transparent)
+            // 3. 添加点击事件处理器
+            //    原理: clickable 修饰符使整个 Row 区域都可以响应点击，并执行传入的 onClick lambda。
+            .clickable { onClick() }
+            // 4. 使用 onPointerEvent 监听鼠标的进入和退出事件
+            //    原理: PointerEventType.Enter 事件在鼠标光标进入组件区域时触发，我们将 isHovered 设为 true。
+            //          PointerEventType.Exit 事件在鼠标光标离开时触发，我们将 isHovered 设为 false。
+            //          这是一种实现Hover效果的高效方式。
+            .onPointerEvent(PointerEventType.Enter) { isHovered = true }
+            .onPointerEvent(PointerEventType.Exit) { isHovered = false }
+            .fillMaxWidth()
+    ) {
         Text(
             text = data.name,
             modifier = Modifier.weight(1f),

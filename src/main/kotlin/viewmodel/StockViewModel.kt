@@ -302,4 +302,22 @@ class StockViewModel {
             logger.info("[自选股配置]: 移除自选股 $code 并已保存。")
         }
     }
+
+    /**
+     * 切换主窗口监控的目标股票。
+     * @param newCode 新的股票代码
+     */
+    fun switchTargetStock(newCode: String) {
+        // 目的: 更新应用配置中的目标股票代码。
+        // 原理: 直接为 AppConfig 的类型安全属性 targetStock 赋值。
+        AppConfig.targetStock = newCode
+        // 目的: 将变更持久化到配置文件。
+        // 原理: 调用 AppConfig 的 save 方法，将当前所有配置写入磁盘。
+        AppConfig.save()
+        logger.info("[主窗口]: 切换监控目标为 $newCode 并已保存配置。")
+
+        // 目的: 立即刷新主窗口的股票数据，而不是等待下一个轮询周期。
+        // 原理: 调用 refresh 方法，该方法会启动一个协程来执行 fetchRealtimeData，从而更新 UI。
+        refresh()
+    }
 }
