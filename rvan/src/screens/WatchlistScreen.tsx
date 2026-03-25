@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { StockData } from "../data/model/StockData";
 import { getColor, formatPrice, formatPercent } from "../utils/color";
+import { invoke } from "@tauri-apps/api/core";
 
 interface WatchlistScreenProps {
   visible: boolean;
@@ -37,6 +38,15 @@ export const WatchlistScreen: React.FC<WatchlistScreenProps> = (
     const [showAddBar, setShowAddBar] = useState(false);
     const [inputCode, setInputCode] = useState("");
     const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+    const [inputKey, setInputKey] = useState(0);
+
+    const setInputFocusMode = async (focusable: boolean) => {
+      try {
+        await invoke("set_watchlist_focusable", { focusable });
+      } catch (error) {
+        console.error(error);
+      }
+    };
 
     // 处理拖拽开始
     const handleDragStart = (index: number) => {
@@ -66,6 +76,7 @@ export const WatchlistScreen: React.FC<WatchlistScreenProps> = (
         onAddStock(inputCode.trim().toLowerCase());
         setInputCode("");
         setShowAddBar(false);
+        setInputFocusMode(false);
       }
     };
 
@@ -76,6 +87,7 @@ export const WatchlistScreen: React.FC<WatchlistScreenProps> = (
       } else if (e.key === "Escape") {
         setShowAddBar(false);
         setInputCode("");
+        setInputFocusMode(false);
       }
     };
 
@@ -106,7 +118,7 @@ export const WatchlistScreen: React.FC<WatchlistScreenProps> = (
     const timeStyle: React.CSSProperties = {
       color: "#AAA",
       fontSize: "7px",
-      fontFamily: "monospace",
+      fontFamily: "var(--number-font)",
     };
 
     const addButtonStyle: React.CSSProperties = {
@@ -184,21 +196,21 @@ export const WatchlistScreen: React.FC<WatchlistScreenProps> = (
       flex: 1.1,
       color: "#FFF",
       fontSize: "10px",
-      fontFamily: "monospace",
+      fontFamily: "var(--number-font)",
       textAlign: "right",
     };
 
     const changeStyle: React.CSSProperties = {
       flex: 1.1,
       fontSize: "10px",
-      fontFamily: "monospace",
+      fontFamily: "var(--number-font)",
       textAlign: "right",
     };
 
     const riseStyle: React.CSSProperties = {
       flex: 1,
       fontSize: "10px",
-      fontFamily: "monospace",
+      fontFamily: "var(--number-font)",
       textAlign: "right",
     };
 
@@ -222,21 +234,17 @@ export const WatchlistScreen: React.FC<WatchlistScreenProps> = (
           {showAddBar ? (
             <div style={addBarStyle}>
               <input
+                key={inputKey}
                 style={inputStyle}
                 type="text"
                 value={inputCode}
                 onChange={(e) => setInputCode(e.target.value.toUpperCase())}
                 onKeyDown={handleKeyDown}
-                onBlur={() => {
-                  if (!inputCode) {
-                    setShowAddBar(false);
-                  }
-                }}
                 autoFocus
                 maxLength={8}
               />
               <button
-                style={iconButtonStyle}
+                style={{ ...iconButtonStyle, color: "#1aad19" }}
                 onClick={handleAddConfirm}
                 disabled={!inputCode.trim()}
               >
@@ -245,10 +253,11 @@ export const WatchlistScreen: React.FC<WatchlistScreenProps> = (
                 </svg>
               </button>
               <button
-                style={iconButtonStyle}
+                style={{ ...iconButtonStyle, color: "#d81e06" }}
                 onClick={() => {
                   setShowAddBar(false);
                   setInputCode("");
+                  setInputFocusMode(false);
                 }}
               >
                 <svg width="8px" height="8px" viewBox="0 0 24 24" fill="currentColor">
@@ -257,7 +266,14 @@ export const WatchlistScreen: React.FC<WatchlistScreenProps> = (
               </button>
             </div>
           ) : (
-            <button style={addButtonStyle} onClick={() => setShowAddBar(true)}>
+            <button
+              style={addButtonStyle}
+              onClick={async () => {
+                await setInputFocusMode(true);
+                setInputKey((prev) => prev + 1);
+                setShowAddBar(true);
+              }}
+            >
               <svg width="8px" height="8px" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
               </svg>

@@ -10,6 +10,8 @@ interface StockInfoProps {
  * 股票信息显示组件
  */
 export const StockInfo: React.FC<StockInfoProps> = ({ stockData }) => {
+  const textOpacity = 0.4;
+
   if (!stockData) {
     return (
       <div
@@ -20,6 +22,7 @@ export const StockInfo: React.FC<StockInfoProps> = ({ stockData }) => {
           height: "100%",
           color: "#888",
           fontSize: "10px",
+          opacity: textOpacity,
         }}
       >
         加载中...
@@ -38,7 +41,7 @@ export const StockInfo: React.FC<StockInfoProps> = ({ stockData }) => {
         padding: "2px 6px",
         height: "100%",
         boxSizing: "border-box",
-        backgroundColor: "rgba(0, 0, 0, 0.85)",
+        backgroundColor: "rgba(0, 0, 0, 0)",
         borderRadius: "8px",
       }}
     >
@@ -47,9 +50,10 @@ export const StockInfo: React.FC<StockInfoProps> = ({ stockData }) => {
           flex: 1.2,
           color: priceColor,
           fontSize: "11px",
-          fontFamily: "monospace",
+          fontFamily: "var(--number-font)",
           textAlign: "center",
           fontWeight: "bold",
+          opacity: textOpacity,
         }}
       >
         {formatPrice(stockData.price)}
@@ -61,8 +65,9 @@ export const StockInfo: React.FC<StockInfoProps> = ({ stockData }) => {
           flex: 1.1,
           color: priceColor,
           fontSize: "10px",
-          fontFamily: "monospace",
+          fontFamily: "var(--number-font)",
           textAlign: "center",
+          opacity: textOpacity,
         }}
       >
         {formatPercent(stockData.changePercent)}
@@ -73,8 +78,9 @@ export const StockInfo: React.FC<StockInfoProps> = ({ stockData }) => {
           flex: 1,
           color: getColor(stockData.indexPercent),
           fontSize: "10px",
-          fontFamily: "monospace",
+          fontFamily: "var(--number-font)",
           textAlign: "center",
+          opacity: textOpacity,
         }}
       >
         {formatPercent(stockData.indexPercent)}

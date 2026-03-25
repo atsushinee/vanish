@@ -40,9 +40,13 @@ impl Default for AppConfig {
 
 impl AppConfig {
     fn get_config_path() -> PathBuf {
-        let mut path = std::env::current_dir().unwrap_or_default();
-        path.push("config.properties");
-        path
+        let cwd = std::env::current_dir().unwrap_or_default();
+        if cwd.file_name().and_then(|name| name.to_str()) == Some("src-tauri") {
+            if let Some(parent) = cwd.parent() {
+                return parent.join("config.properties");
+            }
+        }
+        cwd.join("config.properties")
     }
 
     pub fn load() -> Self {
@@ -210,7 +214,6 @@ fn update_main_window_position(app_handle: AppHandle, x: f64, y: f64) -> Result<
 fn show_window(app_handle: AppHandle, label: String) -> Result<(), String> {
     if let Some(window) = app_handle.get_webview_window(&label) {
         window.show().map_err(|e| e.to_string())?;
-        window.set_focus().map_err(|e| e.to_string())?;
     }
     Ok(())
 }
@@ -232,12 +235,98 @@ fn toggle_window(app_handle: AppHandle, label: String) -> Result<bool, String> {
             Ok(false)
         } else {
             window.show().map_err(|e| e.to_string())?;
-            window.set_focus().map_err(|e| e.to_string())?;
             Ok(true)
         }
     } else {
         Ok(false)
     }
+}
+
+fn position_watchlist_near_main(app_handle: &AppHandle) -> Result<(), String> {
+    let main_window = app_handle
+        .get_webview_window("main")
+        .ok_or("main window not found")?;
+    let watchlist_window = app_handle
+        .get_webview_window("watchlist")
+        .ok_or("watchlist window not found")?;
+
+    let main_pos = main_window.outer_position().map_err(|e| e.to_string())?;
+    let main_size = main_window.outer_size().map_err(|e| e.to_string())?;
+    let watchlist_size = watchlist_window.outer_size().map_err(|e| e.to_string())?;
+
+    let target_x = main_pos.x + ((main_size.width as i32 - watchlist_size.width as i32) / 2);
+    let target_y = main_pos.y - watchlist_size.height as i32;
+
+    watchlist_window
+        .set_position(tauri::Position::Physical(tauri::PhysicalPosition::new(
+            target_x,
+            target_y,
+        )))
+        .map_err(|e| e.to_string())
+}
+
+fn position_timeshare_near_main(app_handle: &AppHandle) -> Result<(), String> {
+    let main_window = app_handle
+        .get_webview_window("main")
+        .ok_or("main window not found")?;
+    let timeshare_window = app_handle
+        .get_webview_window("timeshare")
+        .ok_or("timeshare window not found")?;
+
+    let main_pos = main_window.outer_position().map_err(|e| e.to_string())?;
+    let main_size = main_window.outer_size().map_err(|e| e.to_string())?;
+    let timeshare_size = timeshare_window.outer_size().map_err(|e| e.to_string())?;
+
+    let target_x = main_pos.x + ((main_size.width as i32 - timeshare_size.width as i32) / 2);
+    let target_y = main_pos.y - timeshare_size.height as i32;
+
+    timeshare_window
+        .set_position(tauri::Position::Physical(tauri::PhysicalPosition::new(
+            target_x, target_y,
+        )))
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn toggle_watchlist_near_main(app_handle: AppHandle) -> Result<bool, String> {
+    let watchlist_window = app_handle
+        .get_webview_window("watchlist")
+        .ok_or("watchlist window not found")?;
+
+    let is_visible = watchlist_window.is_visible().map_err(|e| e.to_string())?;
+    if is_visible {
+        watchlist_window.hide().map_err(|e| e.to_string())?;
+        return Ok(false);
+    }
+
+    position_watchlist_near_main(&app_handle)?;
+    watchlist_window.show().map_err(|e| e.to_string())?;
+    Ok(true)
+}
+
+#[tauri::command]
+fn toggle_timeshare_near_main(app_handle: AppHandle) -> Result<bool, String> {
+    let timeshare_window = app_handle
+        .get_webview_window("timeshare")
+        .ok_or("timeshare window not found")?;
+
+    let is_visible = timeshare_window.is_visible().map_err(|e| e.to_string())?;
+    if is_visible {
+        timeshare_window.hide().map_err(|e| e.to_string())?;
+        return Ok(false);
+    }
+
+    position_timeshare_near_main(&app_handle)?;
+    timeshare_window.show().map_err(|e| e.to_string())?;
+    Ok(true)
+}
+
+#[tauri::command]
+fn set_watchlist_focusable(app_handle: AppHandle, focusable: bool) -> Result<(), String> {
+    if let Some(window) = app_handle.get_webview_window("watchlist") {
+        window.set_focusable(focusable).map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -278,6 +367,9 @@ pub fn run() {
             show_window,
             hide_window,
             toggle_window,
+            toggle_watchlist_near_main,
+            toggle_timeshare_near_main,
+            set_watchlist_focusable,
             exit_app,
             start_dragging,
             get_window_position,
@@ -286,25 +378,39 @@ pub fn run() {
         .setup(|app| {
             // 获取主窗口并设置右键菜单
             let main_window = app.get_webview_window("main").unwrap();
-            let show_history_i = MenuItem::with_id(app, "show_history", "历史记录", true, None::<&str>)?;
-            let show_watchlist_i = MenuItem::with_id(app, "show_watchlist", "自选列表", true, None::<&str>)?;
-            let show_timeshare_i = MenuItem::with_id(app, "show_timeshare", "分时图", true, None::<&str>)?;
-            let exit_i = MenuItem::with_id(app, "exit_app", "退出", true, None::<&str>)?;
-            let context_menu = Menu::with_items(app, &[&show_history_i, &show_watchlist_i, &show_timeshare_i, &exit_i])?;
-            main_window.set_menu(context_menu)?;
-
-
+            for label in ["main", "watchlist", "timeshare"] {
+                if let Some(window) = app.get_webview_window(label) {
+                    let _ = window.set_decorations(false);
+                    let _ = window.set_shadow(false);
+                    let _ = window.set_focusable(false);
+                }
+            }
+            let app_handle = app.handle().clone();
+            main_window.on_window_event(move |event| {
+                if let tauri::WindowEvent::Moved(_) = event {
+                    if let Some(watchlist_window) = app_handle.get_webview_window("watchlist") {
+                        if watchlist_window.is_visible().unwrap_or(false) {
+                            let _ = position_watchlist_near_main(&app_handle);
+                        }
+                    }
+                    if let Some(timeshare_window) = app_handle.get_webview_window("timeshare") {
+                        if timeshare_window.is_visible().unwrap_or(false) {
+                            let _ = position_timeshare_near_main(&app_handle);
+                        }
+                    }
+                }
+            });
             // 创建托盘菜单
             let quit_i = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&quit_i])?;
 
             // 加载图标
-            let icon_bytes = include_bytes!("../icons/icon.png");
+            let icon_bytes = include_bytes!("../icons/app.ico");
             let icon = Image::from_bytes(icon_bytes)?;
 
             let _tray = TrayIconBuilder::new()
                 .icon(icon)
-                .tooltip("rvan - AI 交易助手")
+                .tooltip("rvan")
                 .menu(&menu)
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "quit" => {
@@ -322,18 +428,6 @@ pub fn run() {
                         }
                         app.exit(0);
                     }
-                    "show_history" => {
-                        let _ = show_window(app.clone(), "history".to_string());
-                    }
-                    "show_watchlist" => {
-                        let _ = show_window(app.clone(), "watchlist".to_string());
-                    }
-                    "show_timeshare" => {
-                        let _ = show_window(app.clone(), "timeshare".to_string());
-                    }
-                    "exit_app" => {
-                        app.exit(0);
-                    }
                     _ => {}
                 })
                 .on_tray_icon_event(|tray, event| {
@@ -344,7 +438,7 @@ pub fn run() {
                     } = event
                     {
                         let app = tray.app_handle();
-                        if let Some(window) = app.get_webview_window("main") {
+                        if let Some(_window) = app.get_webview_window("main") {
                             let _ = toggle_window(app.clone(), "main".to_string());
                         }
                     }

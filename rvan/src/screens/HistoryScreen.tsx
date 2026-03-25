@@ -68,7 +68,7 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = (
       width: "50px",
       color: "#FFF",
       fontSize: "11px",
-      fontFamily: "monospace",
+      fontFamily: "var(--number-font)",
       textAlign: "center",
     };
 
@@ -76,28 +76,28 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = (
       width: "46px",
       color: "#FFF",
       fontSize: "11px",
-      fontFamily: "monospace",
+      fontFamily: "var(--number-font)",
       textAlign: "right",
     };
 
     const percentStyle: React.CSSProperties = {
       width: "46px",
       fontSize: "11px",
-      fontFamily: "monospace",
+      fontFamily: "var(--number-font)",
       textAlign: "right",
     };
 
     const riseStyle: React.CSSProperties = {
       width: "41px",
       fontSize: "11px",
-      fontFamily: "monospace",
+      fontFamily: "var(--number-font)",
       textAlign: "right",
     };
 
     const indexStyle: React.CSSProperties = {
       width: "41px",
       fontSize: "11px",
-      fontFamily: "monospace",
+      fontFamily: "var(--number-font)",
       textAlign: "right",
     };
 

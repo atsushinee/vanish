@@ -4,6 +4,10 @@
   box-sizing: border-box;
 }
 
+:root {
+  --number-font: "JetBrains Mono", "Consolas", "SFMono-Regular", "Roboto Mono", monospace;
+}
+
 html,
 body,
 #root {
