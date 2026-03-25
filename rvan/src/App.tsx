@@ -3,12 +3,12 @@ import { Observer } from "mobx-react-lite";
 import { StockViewModel } from "./viewmodels/StockViewModel";
 import { TimeShareViewModel } from "./viewmodels/TimeShareViewModel";
 import { StockInfo } from "./components/StockInfo";
-import { ContextMenu } from "./components/ContextMenu";
 import { HistoryScreen } from "./screens/HistoryScreen";
 import { WatchlistScreen } from "./screens/WatchlistScreen";
 import { TimeShareScreen } from "./screens/TimeShareScreen";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { loadConfig } from "./config/AppConfig";
 
 /**
  * 主应用组件
@@ -20,15 +20,13 @@ export const App: React.FC = () => {
 
   // UI 状态
   const [isWindowVisible, setIsWindowVisible] = useState(true);
-  const [showContextMenu, setShowContextMenu] = useState(false);
-  const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
   const [showHistory, setShowHistory] = useState(false);
   const [showWatchlist, setShowWatchlist] = useState(false);
   const [showTimeShare, setShowTimeShare] = useState(false);
 
-  // 窗口位置（像素）
-  // const [windowPosition, setWindowPosition] = useState({ x: 18, y: 811 });
-  const windowPosition = { x: 18, y: 811 };
+  // 窗口位置（像素）— 实际由 Rust 管理
+  const [windowPosition, setWindowPosition] = useState({ x: 18, y: 811 });
+  // const windowPosition = { x: 18, y: 811 };
 
   // 窗口尺寸
   const windowWidth = 108;
@@ -44,12 +42,6 @@ export const App: React.FC = () => {
   const timeSharePosition = { x: windowPosition.x - 46, y: windowPosition.y - 70 };
   const timeShareSize = { width: 200, height: 70 };
 
-  // 处理右键点击
-  const handleContextMenu = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    setContextMenuPosition({ x: e.clientX, y: e.clientY });
-    setShowContextMenu(true);
-  }, []);
 
   // 处理双击
   const handleDoubleClick = useCallback(() => {
@@ -104,6 +96,13 @@ export const App: React.FC = () => {
       setTimeShareViewModel(vm);
     }
   }, [stockViewModel.stockData, showTimeShare, timeShareViewModel]);
+
+  // 加载窗口位置
+  useEffect(() => {
+    loadConfig().then((config) => {
+      setWindowPosition({ x: config.window_x, y: config.window_y });
+    });
+  }, []);
 
   // 更新时间线 ViewModel
   useEffect(() => {
@@ -165,7 +164,7 @@ export const App: React.FC = () => {
             height: "100vh",
             overflow: "hidden",
           }}
-          onContextMenu={handleContextMenu}
+          onContextMenu={()=>{}}
           onDoubleClick={handleDoubleClick}
         >
           {/* 主窗口内容 */}
@@ -173,30 +172,17 @@ export const App: React.FC = () => {
             <div
               style={{
                 position: "fixed",
-                left: windowPosition.x,
-                top: windowPosition.y,
-                width: windowWidth,
-                height: windowHeight,
+                inset: 0,
                 backgroundColor: "rgba(0, 0, 0, 0)",
                 borderRadius: "8px",
-                cursor: "grab",
                 userSelect: "none",
+                pointerEvents: "none", // 关键：点击穿透到原生窗口
               }}
             >
               <StockInfo stockData={stockViewModel.stockData} />
             </div>
           )}
 
-          {/* 右键菜单 */}
-          <ContextMenu
-            visible={showContextMenu}
-            position={contextMenuPosition}
-            onClose={() => setShowContextMenu(false)}
-            onShowHistory={() => setShowHistory(true)}
-            onShowWatchlist={() => setShowWatchlist(true)}
-            onShowTimeShare={() => setShowTimeShare(true)}
-            onCloseApp={handleCloseApp}
-          />
 
           {/* 历史记录弹窗 */}
           <HistoryScreen

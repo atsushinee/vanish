@@ -38,32 +38,17 @@ export const StockInfo: React.FC<StockInfoProps> = ({ stockData }) => {
         padding: "2px 6px",
         height: "100%",
         boxSizing: "border-box",
+        backgroundColor: "rgba(0, 0, 0, 0.85)",
+        borderRadius: "8px",
       }}
     >
-      {/* 股票名称 */}
-      <div
-        style={{
-          flex: 1.5,
-          color: "#FFF",
-          fontSize: "10px",
-          fontWeight: "bold",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-          textAlign: "left",
-        }}
-      >
-        {stockData.name || stockData.code}
-      </div>
-
-      {/* 价格 */}
       <div
         style={{
           flex: 1.2,
           color: priceColor,
           fontSize: "11px",
           fontFamily: "monospace",
-          textAlign: "right",
+          textAlign: "center",
           fontWeight: "bold",
         }}
       >
@@ -77,33 +62,19 @@ export const StockInfo: React.FC<StockInfoProps> = ({ stockData }) => {
           color: priceColor,
           fontSize: "10px",
           fontFamily: "monospace",
-          textAlign: "right",
+          textAlign: "center",
         }}
       >
         {formatPercent(stockData.changePercent)}
       </div>
 
-      {/* 涨速 */}
-      <div
-        style={{
-          flex: 1,
-          color: getColor(stockData.rise),
-          fontSize: "10px",
-          fontFamily: "monospace",
-          textAlign: "right",
-        }}
-      >
-        {formatPercent(stockData.rise)}
-      </div>
-
-      {/* 指数 */}
       <div
         style={{
           flex: 1,
           color: getColor(stockData.indexPercent),
           fontSize: "10px",
           fontFamily: "monospace",
-          textAlign: "right",
+          textAlign: "center",
         }}
       >
         {formatPercent(stockData.indexPercent)}

@@ -82,7 +82,7 @@ impl AppConfig {
         config
     }
 
-    pub fn save(&self) -> Result<()> {
+    pub fn save(&self) -> Result<(), String> {
         let path = Self::get_config_path();
         let mut content = String::from("#Vanish App Configuration\n");
         content.push_str(&format!("ui.window.x={}\n", self.window_x));
@@ -96,8 +96,7 @@ impl AppConfig {
         if !self.gemini_api_key.is_empty() {
             content.push_str(&format!("ai.gemini.apiKey={}\n", self.gemini_api_key));
         }
-        fs::write(&path, content)?;
-        Ok(())
+        fs::write(&path, content).map_err(|e| e.to_string())
     }
 }
 
@@ -246,6 +245,24 @@ fn exit_app(app_handle: AppHandle) {
     app_handle.exit(0);
 }
 
+#[tauri::command]
+fn start_dragging(window: tauri::Window) -> Result<(), String> {
+    window.start_dragging().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn get_window_position(window: tauri::Window) -> Result<(i32, i32), String> {
+    window.outer_position().map(|p| (p.x, p.y)).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn save_window_position(x: i32, y: i32, state: tauri::State<Mutex<AppConfig>>) -> Result<(), String> {
+    let mut config = state.lock().map_err(|e| e.to_string())?;
+    config.window_x = x as f64 / 2.0;
+    config.window_y = y as f64 / 2.0;
+    config.save().map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -261,15 +278,28 @@ pub fn run() {
             show_window,
             hide_window,
             toggle_window,
-            exit_app
+            exit_app,
+            start_dragging,
+            get_window_position,
+            save_window_position
         ])
         .setup(|app| {
+            // 获取主窗口并设置右键菜单
+            let main_window = app.get_webview_window("main").unwrap();
+            let show_history_i = MenuItem::with_id(app, "show_history", "历史记录", true, None::<&str>)?;
+            let show_watchlist_i = MenuItem::with_id(app, "show_watchlist", "自选列表", true, None::<&str>)?;
+            let show_timeshare_i = MenuItem::with_id(app, "show_timeshare", "分时图", true, None::<&str>)?;
+            let exit_i = MenuItem::with_id(app, "exit_app", "退出", true, None::<&str>)?;
+            let context_menu = Menu::with_items(app, &[&show_history_i, &show_watchlist_i, &show_timeshare_i, &exit_i])?;
+            main_window.set_menu(context_menu)?;
+
+
             // 创建托盘菜单
             let quit_i = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&quit_i])?;
 
             // 加载图标
-            let icon_bytes = include_bytes!("../icons/icon.ico");
+            let icon_bytes = include_bytes!("../icons/icon.png");
             let icon = Image::from_bytes(icon_bytes)?;
 
             let _tray = TrayIconBuilder::new()
@@ -278,11 +308,10 @@ pub fn run() {
                 .menu(&menu)
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "quit" => {
-                        // 保存配置
+                        // 保存配置（此处可移除，因 on_window_event 已自动保存）
                         let config = app.state::<Mutex<AppConfig>>();
                         if let Ok(current_config) = config.lock() {
                             let mut updated_config = current_config.clone();
-                            // 更新窗口位置等配置
                             if let Some(window) = app.get_webview_window("main") {
                                 if let Ok(pos) = window.outer_position() {
                                     updated_config.window_x = pos.x as f64 / 2.0;
@@ -291,6 +320,18 @@ pub fn run() {
                             }
                             let _ = updated_config.save();
                         }
+                        app.exit(0);
+                    }
+                    "show_history" => {
+                        let _ = show_window(app.clone(), "history".to_string());
+                    }
+                    "show_watchlist" => {
+                        let _ = show_window(app.clone(), "watchlist".to_string());
+                    }
+                    "show_timeshare" => {
+                        let _ = show_window(app.clone(), "timeshare".to_string());
+                    }
+                    "exit_app" => {
                         app.exit(0);
                     }
                     _ => {}

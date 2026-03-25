@@ -58,9 +58,7 @@ export class StockViewModel {
 
     this.fetchRealtimeData();
     this.monitorInterval = setInterval(() => {
-      if (this.isTradingTime()) {
-        this.fetchRealtimeData();
-      }
+      this.fetchRealtimeData();
     }, 1000);
   }
 
@@ -84,9 +82,7 @@ export class StockViewModel {
 
     this.fetchWatchlistData();
     this.watchlistInterval = setInterval(() => {
-      if (this.isTradingTime()) {
-        this.fetchWatchlistData();
-      }
+      this.fetchWatchlistData();
     }, 1000);
   }
 
@@ -286,7 +282,7 @@ export class StockViewModel {
     const totalMinutes = hours * 60 + minutes;
 
     // 上午 9:25-11:31
-    const amStart = 9 * 60 + 25;
+    const amStart = 9 * 60 + 15;
     const amEnd = 11 * 60 + 31;
     // 下午 13:00-15:01
     const pmStart = 13 * 60;
