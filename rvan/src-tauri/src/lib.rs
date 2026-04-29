@@ -2,13 +2,29 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use tauri::{
     image::Image,
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Manager,
+    AppHandle, Emitter, Manager,
 };
+
+/// 股票状态 - 在 Rust 后端共享
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct StockState {
+    pub target_stock: String,
+    pub index_code: String,
+}
+
+impl Default for StockState {
+    fn default() -> Self {
+        Self {
+            target_stock: "sh600593".to_string(),
+            index_code: "sh000001".to_string(),
+        }
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AppConfig {
@@ -40,12 +56,8 @@ impl Default for AppConfig {
 
 impl AppConfig {
     fn get_config_path() -> PathBuf {
+        // 始终只读取程序运行目录下的配置文件
         let cwd = std::env::current_dir().unwrap_or_default();
-        if cwd.file_name().and_then(|name| name.to_str()) == Some("src-tauri") {
-            if let Some(parent) = cwd.parent() {
-                return parent.join("config.properties");
-            }
-        }
         cwd.join("config.properties")
     }
 
@@ -114,6 +126,42 @@ fn save_config(config: AppConfig, state: tauri::State<Mutex<AppConfig>>) -> Resu
     let mut state = state.lock().map_err(|e| e.to_string())?;
     *state = config.clone();
     config.save().map_err(|e| e.to_string())
+}
+
+/// 切换目标股票 - 更新共享状态并发出事件
+#[tauri::command]
+fn switch_target_stock(
+    app_handle: AppHandle,
+    new_code: String,
+    stock_state: tauri::State<Arc<Mutex<StockState>>>,
+    config_state: tauri::State<Mutex<AppConfig>>,
+) -> Result<(), String> {
+    // 更新共享状态
+    {
+        let mut state = stock_state.lock().map_err(|e| e.to_string())?;
+        state.target_stock = new_code.clone();
+    }
+
+    // 更新配置文件
+    {
+        let mut config = config_state.lock().map_err(|e| e.to_string())?;
+        config.target_stock = new_code.clone();
+        let config_clone = config.clone();
+        config_clone.save().map_err(|e| e.to_string())?;
+    }
+
+    // 发出事件通知所有窗口
+    app_handle
+        .emit("switch-target-stock", new_code)
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+/// 获取共享的股票状态
+#[tauri::command]
+fn get_stock_state(state: tauri::State<Arc<Mutex<StockState>>>) -> StockState {
+    state.lock().unwrap().clone()
 }
 
 #[tauri::command]
@@ -254,8 +302,23 @@ fn position_watchlist_near_main(app_handle: &AppHandle) -> Result<(), String> {
     let main_size = main_window.outer_size().map_err(|e| e.to_string())?;
     let watchlist_size = watchlist_window.outer_size().map_err(|e| e.to_string())?;
 
+    // 检查分时图窗口是否可见
+    let timeshare_window = app_handle.get_webview_window("timeshare");
+    let timeshare_visible = timeshare_window
+        .as_ref()
+        .and_then(|w| w.is_visible().ok())
+        .unwrap_or(false);
+
     let target_x = main_pos.x + ((main_size.width as i32 - watchlist_size.width as i32) / 2);
-    let target_y = main_pos.y - watchlist_size.height as i32;
+    let target_y = if timeshare_visible && timeshare_window.is_some() {
+        // 分时窗口可见时，自选窗口显示在分时窗口下方（主窗口上方）
+        let ts_window = timeshare_window.unwrap();
+        let timeshare_size = ts_window.outer_size().map_err(|e| e.to_string())?;
+        main_pos.y - timeshare_size.height as i32 - watchlist_size.height as i32
+    } else {
+        // 分时窗口不可见时，自选窗口显示在主窗口上方
+        main_pos.y - watchlist_size.height as i32
+    };
 
     watchlist_window
         .set_position(tauri::Position::Physical(tauri::PhysicalPosition::new(
@@ -277,8 +340,23 @@ fn position_timeshare_near_main(app_handle: &AppHandle) -> Result<(), String> {
     let main_size = main_window.outer_size().map_err(|e| e.to_string())?;
     let timeshare_size = timeshare_window.outer_size().map_err(|e| e.to_string())?;
 
+    // 检查自选窗口是否可见
+    let watchlist_window = app_handle.get_webview_window("watchlist");
+    let watchlist_visible = watchlist_window
+        .as_ref()
+        .and_then(|w| w.is_visible().ok())
+        .unwrap_or(false);
+
     let target_x = main_pos.x + ((main_size.width as i32 - timeshare_size.width as i32) / 2);
-    let target_y = main_pos.y - timeshare_size.height as i32;
+    let target_y = if watchlist_visible && watchlist_window.is_some() {
+        // 自选窗口可见时，分时窗口显示在自选窗口上方
+        let wl_window = watchlist_window.unwrap();
+        let watchlist_size = wl_window.outer_size().map_err(|e| e.to_string())?;
+        main_pos.y - watchlist_size.height as i32 - timeshare_size.height as i32
+    } else {
+        // 自选窗口不可见时，分时窗口显示在主窗口上方
+        main_pos.y - timeshare_size.height as i32
+    };
 
     timeshare_window
         .set_position(tauri::Position::Physical(tauri::PhysicalPosition::new(
@@ -296,11 +374,28 @@ fn toggle_watchlist_near_main(app_handle: AppHandle) -> Result<bool, String> {
     let is_visible = watchlist_window.is_visible().map_err(|e| e.to_string())?;
     if is_visible {
         watchlist_window.hide().map_err(|e| e.to_string())?;
+        // 关闭自选窗口后，如果分时窗口可见，重新定位分时窗口
+        let timeshare_window = app_handle.get_webview_window("timeshare");
+        if let Some(ts_window) = timeshare_window {
+            if ts_window.is_visible().unwrap_or(false) {
+                let _ = position_timeshare_near_main(&app_handle);
+            }
+        }
         return Ok(false);
     }
 
+    // 先显示自选窗口并定位
     position_watchlist_near_main(&app_handle)?;
     watchlist_window.show().map_err(|e| e.to_string())?;
+
+    // 自选窗口显示后，如果分时窗口可见，重新定位分时窗口（移到自选窗口上方）
+    let timeshare_window = app_handle.get_webview_window("timeshare");
+    if let Some(ts_window) = timeshare_window {
+        if ts_window.is_visible().unwrap_or(false) {
+            let _ = position_timeshare_near_main(&app_handle);
+        }
+    }
+
     Ok(true)
 }
 
@@ -313,6 +408,13 @@ fn toggle_timeshare_near_main(app_handle: AppHandle) -> Result<bool, String> {
     let is_visible = timeshare_window.is_visible().map_err(|e| e.to_string())?;
     if is_visible {
         timeshare_window.hide().map_err(|e| e.to_string())?;
+        // 关闭分时窗口后，如果自选窗口可见，重新定位自选窗口
+        let watchlist_window = app_handle.get_webview_window("watchlist");
+        if let Some(wl_window) = watchlist_window {
+            if wl_window.is_visible().unwrap_or(false) {
+                let _ = position_watchlist_near_main(&app_handle);
+            }
+        }
         return Ok(false);
     }
 
@@ -354,13 +456,22 @@ fn save_window_position(x: i32, y: i32, state: tauri::State<Mutex<AppConfig>>) -
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let config = AppConfig::load();
+    let initial_stock_state = StockState {
+        target_stock: config.target_stock.clone(),
+        index_code: config.index_code.clone(),
+    };
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_shell::init())
-        .manage(Mutex::new(AppConfig::load()))
+        .manage(Mutex::new(config))
+        .manage(Arc::new(Mutex::new(initial_stock_state)))
         .invoke_handler(tauri::generate_handler![
             get_config,
             save_config,
+            switch_target_stock,
+            get_stock_state,
             fetch_sina_realtime_data,
             fetch_eastmoney_timeshare,
             update_main_window_position,

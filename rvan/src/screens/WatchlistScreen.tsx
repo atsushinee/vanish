@@ -283,7 +283,7 @@ export const WatchlistScreen: React.FC<WatchlistScreenProps> = (
 
         {/* 自选股列表 */}
         <div style={listStyle}>
-          {watchlistData.map((data, index) => (
+          {watchlistData.length === 0 ? null : watchlistData.map((data, index) => (
             <div
               key={data.code}
               draggable

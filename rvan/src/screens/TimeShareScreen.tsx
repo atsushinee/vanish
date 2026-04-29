@@ -122,20 +122,6 @@ export const TimeShareScreen: React.FC<TimeShareScreenProps> = (
     return (
       <div style={containerStyle} onDoubleClick={onClose}>
         <canvas ref={canvasRef} style={canvasStyle} />
-        {points.length === 0 && (
-          <div
-            style={{
-              position: "absolute",
-              top: "50%",
-              left: "50%",
-              transform: "translate(-50%, -50%)",
-              color: "#FFF",
-              fontSize: "12px",
-            }}
-          >
-            暂无数据
-          </div>
-        )}
       </div>
     );
   };

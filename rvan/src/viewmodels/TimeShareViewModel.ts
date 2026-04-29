@@ -1,6 +1,7 @@
 import { makeAutoObservable, runInAction } from "mobx";
 import { TimeSharePoint } from "../data/model/StockData";
 import { fetchEastMoneyTimeShare } from "../data/remote/ApiClient";
+import { listen } from "@tauri-apps/api/event";
 
 /**
  * UI 状态类型
@@ -22,6 +23,20 @@ export class TimeShareViewModel {
     this.code = code;
     makeAutoObservable(this);
     this.loadTimeShareData();
+    // 监听股票切换事件
+    this.listenSwitchTargetEvent();
+  }
+
+  /**
+   * 监听股票切换事件
+   */
+  private async listenSwitchTargetEvent(): Promise<void> {
+    await listen<string>("switch-target-stock", (event) => {
+      const newCode = event.payload;
+      if (newCode !== this.code) {
+        this.updateCode(newCode);
+      }
+    });
   }
 
   /**
@@ -88,8 +103,15 @@ export class TimeShareViewModel {
    * 更新代码并重新加载
    */
   updateCode(code: string): void {
+    if (this.code === code) {
+      // 代码相同，只重新加载数据
+      this.loadTimeShareData();
+      return;
+    }
     this.code = code;
-    this.uiState = { type: "loading" };
+    runInAction(() => {
+      this.uiState = { type: "loading" };
+    });
     this.loadTimeShareData();
   }
 }

@@ -2,6 +2,8 @@ import { makeAutoObservable, runInAction } from "mobx";
 import { StockData } from "../data/model/StockData";
 import { loadConfig, saveConfig } from "../config/AppConfig";
 import { fetchSinaRealtimeData } from "../data/remote/ApiClient";
+import { listen } from "@tauri-apps/api/event";
+import { invoke } from "@tauri-apps/api/core";
 
 /**
  * 股票 ViewModel - 管理股票数据和自选股
@@ -32,9 +34,27 @@ export class StockViewModel {
   private monitorInterval: ReturnType<typeof setInterval> | null = null;
   private watchlistInterval: ReturnType<typeof setInterval> | null = null;
 
+  // 缓存的配置
+  private targetStock: string = "";
+  private indexCode: string = "";
+
   constructor() {
     makeAutoObservable(this);
     this.init();
+    // 监听 Rust 后端发出的股票切换事件
+    this.listenSwitchTargetEvent();
+  }
+
+  /**
+   * 监听股票切换事件
+   */
+  private async listenSwitchTargetEvent(): Promise<void> {
+    await listen<string>("switch-target-stock", (event) => {
+      const newCode = event.payload;
+      if (newCode !== this.targetStock) {
+        this.switchTargetStockInternal(newCode);
+      }
+    });
   }
 
   /**
@@ -44,6 +64,8 @@ export class StockViewModel {
     const config = await loadConfig();
     runInAction(() => {
       this.watchlistCodes = [...config.watchlist];
+      this.targetStock = config.target_stock;
+      this.indexCode = config.index_code;
     });
     this.startRealtimeMonitor();
   }
@@ -94,11 +116,12 @@ export class StockViewModel {
       clearInterval(this.watchlistInterval);
       this.watchlistInterval = null;
     }
-    runInAction(() => {
-      this.watchlistData = [];
-      this.watchlistLastPrices.clear();
-      this.lastUpdateTime = "";
-    });
+    // 不清空数据，保持显示直到下次打开
+    // runInAction(() => {
+    //   this.watchlistData = [];
+    //   this.watchlistLastPrices.clear();
+    //   this.lastUpdateTime = "";
+    // });
   }
 
   /**
@@ -106,17 +129,14 @@ export class StockViewModel {
    */
   private async fetchRealtimeData(): Promise<void> {
     try {
-      const config = await loadConfig();
-      const targetStock = config.target_stock;
-      const indexCode = config.index_code;
-
-      const codes = [targetStock, indexCode].join(",");
+      // 使用缓存的配置，避免每次请求都调用 loadConfig()
+      const codes = [this.targetStock, this.indexCode].join(",");
       const rawResponse = await fetchSinaRealtimeData(codes);
 
       const quotesMap = this.parseSinaResponse(rawResponse);
 
-      const stockQuote = quotesMap.get(targetStock);
-      const indexQuote = quotesMap.get(indexCode);
+      const stockQuote = quotesMap.get(this.targetStock);
+      const indexQuote = quotesMap.get(this.indexCode);
 
       if (stockQuote && indexQuote) {
         const { price: price1, preClose: preClose1 } = stockQuote;
@@ -130,7 +150,7 @@ export class StockViewModel {
         const indexPct = preClose2 > 0 ? (price2 / preClose2 - 1) * 100 : 0;
 
         const newStockData: StockData = {
-          code: targetStock,
+          code: this.targetStock,
           name: "",
           price: price1,
           changePercent: changePct,
@@ -275,22 +295,22 @@ export class StockViewModel {
   /**
    * 判断是否为交易时间
    */
-  private isTradingTime(): boolean {
-    const now = new Date();
-    const hours = now.getHours();
-    const minutes = now.getMinutes();
-    const totalMinutes = hours * 60 + minutes;
-
-    // 上午 9:25-11:31
-    const amStart = 9 * 60 + 15;
-    const amEnd = 11 * 60 + 31;
-    // 下午 13:00-15:01
-    const pmStart = 13 * 60;
-    const pmEnd = 15 * 60 + 1;
-
-    return (totalMinutes >= amStart && totalMinutes <= amEnd) ||
-      (totalMinutes >= pmStart && totalMinutes <= pmEnd);
-  }
+  // private isTradingTime(): boolean {
+  //   const now = new Date();
+  //   const hours = now.getHours();
+  //   const minutes = now.getMinutes();
+  //   const totalMinutes = hours * 60 + minutes;
+  //
+  //   // 上午 9:25-11:31
+  //   const amStart = 9 * 60 + 15;
+  //   const amEnd = 11 * 60 + 31;
+  //   // 下午 13:00-15:01
+  //   const pmStart = 13 * 60;
+  //   const pmEnd = 15 * 60 + 1;
+  //
+  //   return (totalMinutes >= amStart && totalMinutes <= amEnd) ||
+  //     (totalMinutes >= pmStart && totalMinutes <= pmEnd);
+  // }
 
   /**
    * 添加自选股
@@ -330,15 +350,26 @@ export class StockViewModel {
   }
 
   /**
-   * 切换目标股票
+   * 切换目标股票（内部方法，不发出事件）
+   */
+  private async switchTargetStockInternal(newCode: string): Promise<void> {
+    // 更新缓存的配置
+    this.targetStock = newCode;
+    this.lastPrice = 0;
+    
+    // 不清空 stockData，保持旧数据显示直到新数据到达
+    // 这样切换更平滑，不会显示"加载中..."
+    
+    // 重新获取数据
+    this.fetchRealtimeData();
+  }
+
+  /**
+   * 切换目标股票（调用 Rust 后端，由后端发出事件）
    */
   async switchTargetStock(newCode: string): Promise<void> {
-    const config = await loadConfig();
-    config.target_stock = newCode;
-    await saveConfig(config);
-
-    this.lastPrice = 0;
-    this.fetchRealtimeData();
+    // 调用 Rust 后端命令，后端会更新共享状态并发出事件
+    await invoke("switch_target_stock", { newCode });
   }
 
   /**

@@ -25,7 +25,6 @@ export const App: React.FC = () => {
   // ViewModel
   const [stockViewModel] = useState(() => new StockViewModel());
   const [timeShareViewModel, setTimeShareViewModel] = useState<TimeShareViewModel | null>(null);
-  const [timeShareCode, setTimeShareCode] = useState<string | null>(null);
 
   // UI 状态
   const [isWindowVisible, setIsWindowVisible] = useState(true);
@@ -42,12 +41,14 @@ export const App: React.FC = () => {
   const timeShareSize = { width: timeShareWindowSize.width, height: timeShareWindowSize.height };
 
 
-  // 处理双击
+  // 处理双击：切换自选窗口，同时关闭分时窗口
   const handleDoubleClick = useCallback(async () => {
     if (!isMainWindow) return;
 
     try {
       await invoke("toggle_watchlist_near_main");
+      // 双击时关闭分时窗口
+      invoke("hide_window", { label: "timeshare" }).catch(console.error);
     } catch (error) {
       console.error("toggle watchlist dialog failed", error);
     }
@@ -101,41 +102,24 @@ export const App: React.FC = () => {
     };
   }, [isWatchlistWindow, stockViewModel]);
 
-  // 初始化 TimeShareViewModel
+  // 初始化 TimeShareViewModel（只在 timeshare 窗口创建时初始化一次）
   useEffect(() => {
     if (!isTimeShareWindow) return;
-    loadConfig().then((config) => setTimeShareCode(config.target_stock));
+    loadConfig().then((config) => {
+      setTimeShareViewModel(new TimeShareViewModel(config.target_stock));
+    });
   }, [isTimeShareWindow]);
-
-  // 加载窗口位置
-  useEffect(() => {
-    if (!isTimeShareWindow) return;
-    const code = stockViewModel.stockData?.code;
-    if (code) {
-      setTimeShareCode(code);
-    }
-  }, [isTimeShareWindow, stockViewModel.stockData?.code]);
-
-  // 更新时间线 ViewModel
-  useEffect(() => {
-    if (!isTimeShareWindow || !timeShareCode) return;
-    if (!timeShareViewModel) {
-      setTimeShareViewModel(new TimeShareViewModel(timeShareCode));
-      return;
-    }
-    timeShareViewModel.updateCode(timeShareCode);
-  }, [isTimeShareWindow, timeShareCode, timeShareViewModel]);
 
   // 定时刷新分时图
   useEffect(() => {
-    if (!isTimeShareWindow || !timeShareViewModel) return;
+    if (!timeShareViewModel) return;
 
     const interval = setInterval(() => {
       timeShareViewModel.loadTimeShareData();
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [isTimeShareWindow, timeShareViewModel]);
+  }, [timeShareViewModel]);
 
   // 处理添加自选股
   const handleAddStock = useCallback(

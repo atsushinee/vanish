@@ -1,4 +1,5 @@
 import React from "react";
+import { observer } from "mobx-react-lite";
 import { StockData } from "../data/model/StockData";
 import { getColor, formatPrice, formatPercent } from "../utils/color";
 
@@ -9,9 +10,10 @@ interface StockInfoProps {
 /**
  * 股票信息显示组件
  */
-export const StockInfo: React.FC<StockInfoProps> = ({ stockData }) => {
-  const textOpacity = 0.4;
+export const StockInfo: React.FC<StockInfoProps> = observer(({ stockData }) => {
+  const textOpacity = 0.6;
 
+  // 没有数据时显示空白，不显示"加载中..."
   if (!stockData) {
     return (
       <div
@@ -20,12 +22,12 @@ export const StockInfo: React.FC<StockInfoProps> = ({ stockData }) => {
           alignItems: "center",
           justifyContent: "center",
           height: "100%",
-          color: "#888",
+          color: "transparent",
           fontSize: "10px",
           opacity: textOpacity,
         }}
       >
-        加载中...
+        ---
       </div>
     );
   }
@@ -87,4 +89,4 @@ export const StockInfo: React.FC<StockInfoProps> = ({ stockData }) => {
       </div>
     </div>
   );
-};
+});
